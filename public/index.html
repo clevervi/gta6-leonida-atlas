@@ -2,7 +2,10 @@
 <html lang="es">
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=5.0" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=5.0, viewport-fit=cover" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <meta name="mobile-web-app-capable" content="yes" />
   <title>GTA VI — Atlas y Guía Interactiva de Leonida</title>
   <meta name="description" content="Mapa interactivo completo de Leonida en GTA VI (noche y día), guía paso a paso de Extraños y Locos (Kirk y el Skunk Ape, Bret Vogel, Kenton, Yago, Moses, Yasmani), manual de mecánicas, trofeos, coleccionables, armas y vehículos." />
   <meta name="theme-color" content="#08090c" />
@@ -83,13 +86,22 @@
   <main class="view-section active" id="view-map">
     <div class="subbar">
       <div class="region-strip" id="region-bar" role="toolbar" aria-label="Condados de Leonida"></div>
-      <div class="theme-switch" role="group" aria-label="Modo del mapa">
-        <button type="button" class="theme-btn active" id="btn-theme-night" data-theme="night" title="Mapa Nocturno (Tecla N)">NOCHE</button>
-        <button type="button" class="theme-btn" id="btn-theme-day" data-theme="day" title="Mapa de Día (Tecla N)">DÍA</button>
+      <div class="subbar-right">
+        <button type="button" class="live-pill" id="btn-live-feed" title="Actividad comunitaria compartida en vivo">
+          <span class="live-dot" id="live-dot"></span>
+          <span id="live-pill-label">CONECTANDO</span>
+        </button>
+        <div class="theme-switch" role="group" aria-label="Modo del mapa">
+          <button type="button" class="theme-btn active" id="btn-theme-night" data-theme="night" title="Mapa Nocturno (Tecla N)">NOCHE</button>
+          <button type="button" class="theme-btn" id="btn-theme-day" data-theme="day" title="Mapa de Día (Tecla N)">DÍA</button>
+        </div>
       </div>
     </div>
 
     <div class="map-workspace">
+      <!-- MOBILE DRAWER / SHEET BACKDROP -->
+      <div class="mobile-backdrop hidden" id="mobile-backdrop"></div>
+
       <!-- LEFT LEGEND & DIRECTORY SIDEBAR -->
       <aside class="sidebar" id="sidebar">
         <div class="sidebar-top">
@@ -116,7 +128,11 @@
               </label>
               <label class="switch-label">
                 <input type="checkbox" id="chk-show-labels" />
-                <span>Etiquetas fijas</span>
+                <span>Etiquetas</span>
+              </label>
+              <label class="switch-label" title="Mostrar solo marcadores compartidos por la comunidad">
+                <input type="checkbox" id="chk-only-community" />
+                <span>Comunidad</span>
               </label>
             </div>
           </div>
@@ -209,8 +225,9 @@
         </div>
       </section>
 
-      <!-- RIGHT EDITORIAL DETAIL INSPECTOR -->
+      <!-- RIGHT EDITORIAL DETAIL INSPECTOR (BOTTOM SHEET ON MOBILE) -->
       <aside class="inspector hidden" id="inspector" aria-label="Detalles de la ubicación">
+        <div class="sheet-handle" aria-hidden="true"><span></span></div>
         <div class="inspector-top">
           <div class="inspector-head-left">
             <img id="insp-blip" src="" alt="" class="insp-blip-img" />
@@ -613,6 +630,67 @@
       </div>
     </div>
   </div>
+
+  <!-- MODAL: LIVE COMMUNITY ACTIVITY FEED -->
+  <div class="modal-backdrop hidden" id="community-modal-backdrop" role="dialog" aria-modal="true" aria-label="Comunidad en vivo de Leonida">
+    <div class="modal-card community-modal-card">
+      <div class="modal-head">
+        <div class="modal-head-left">
+          <img src="/extracted/blips/blip_contact.png" alt="" class="modal-blip-preview" />
+          <div>
+            <h2>COMUNIDAD DE LEONIDA EN VIVO</h2>
+            <span class="muted mono" id="community-modal-status">Sincronizando hallazgos...</span>
+          </div>
+        </div>
+        <div class="community-head-actions">
+          <button type="button" class="btn btn-sm btn-flat" id="btn-community-refresh" title="Actualizar ahora">ACTUALIZAR</button>
+          <button type="button" class="icon-btn" id="btn-close-community-modal" title="Cerrar">
+            <img src="/extracted/blips/ui_close.png" alt="" class="ui-icon" />
+          </button>
+        </div>
+      </div>
+      <div class="modal-body community-modal-body">
+        <div class="community-stats-row" id="community-stats-row"></div>
+        <div class="community-cta-bar">
+          <span>Los marcadores, votos y notas que publiques aquí son visibles para todos los jugadores de Leonida.</span>
+          <button type="button" class="btn btn-sm btn-primary" id="btn-community-add-pin">+ COMPARTIR PIN</button>
+        </div>
+        <div class="block-head">
+          <h3>ACTIVIDAD RECIENTE</h3>
+          <span class="count-num mono" id="community-feed-count">0</span>
+        </div>
+        <div class="community-feed-list" id="community-feed-list"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- MOBILE BOTTOM NAVIGATION BAR (SHOWN ON <= 760px) -->
+  <nav class="mobile-bottom-nav" role="tablist" aria-label="Navegación móvil">
+    <button type="button" class="mob-tab active" data-view="map">
+      <img src="/extracted/blips/blip_map.png" alt="" />
+      <span>Mapa</span>
+    </button>
+    <button type="button" class="mob-tab" data-view="events">
+      <img src="/extracted/blips/logo_bigfoot.png" alt="" />
+      <span>Eventos</span>
+    </button>
+    <button type="button" class="mob-tab" data-view="guide">
+      <img src="/extracted/blips/blip_target.png" alt="" />
+      <span>Guía</span>
+    </button>
+    <button type="button" class="mob-tab" data-view="collectibles">
+      <img src="/extracted/blips/blip_collectible.png" alt="" />
+      <span>Colecc.</span>
+    </button>
+    <button type="button" class="mob-tab" data-view="arsenal">
+      <img src="/extracted/blips/blip_weapon.png" alt="" />
+      <span>Arsenal</span>
+    </button>
+    <button type="button" class="mob-tab" data-view="blips">
+      <img src="/extracted/blips/blip_radar.png" alt="" />
+      <span>Zonas</span>
+    </button>
+  </nav>
 
   <!-- TOAST NOTIFICATIONS -->
   <div class="toast-stack" id="toast-stack" aria-live="polite"></div>

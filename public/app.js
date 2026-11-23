@@ -175,7 +175,24 @@
     dragOrigTy: 0,
     pointers: new Map(),
     lastPinchDist: 0,
+    lastPinchMidX: 0,
+    lastPinchMidY: 0,
+    lastTapTime: 0,
+    lastTapX: 0,
+    lastTapY: 0,
     pendingDeepLink: null,
+
+    // Shared Live Community DB state
+    liveCommunity: {
+      enabled: false,
+      pins: [],
+      votes: {},
+      comments: {},
+      activity: [],
+      stats: { pins: 0, comments: 0, totalVotes: 0 },
+      syncedAt: null,
+    },
+    onlyCommunity: false,
 
     // Placement & GPS Route Measure modes
     placing: false,
@@ -343,30 +360,125 @@
     } catch (_) { /* noop */ }
   }
 
+  const LS_CLIENT_TOKEN = "gta6_client_token_v1";
+
+  function getClientToken() {
+    try {
+      let tok = localStorage.getItem(LS_CLIENT_TOKEN);
+      if (!tok) {
+        tok = (crypto.randomUUID ? crypto.randomUUID() : `cli-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`);
+        localStorage.setItem(LS_CLIENT_TOKEN, tok);
+      }
+      return tok;
+    } catch (_) {
+      return "anon-client";
+    }
+  }
+
+  async function communityApi(payload = null) {
+    const opts = {
+      method: payload ? "POST" : "GET",
+      headers: {
+        "Content-Type": "application/json",
+        "X-Client-Token": getClientToken(),
+      },
+    };
+    if (payload) opts.body = JSON.stringify(payload);
+    const res = await fetch("/api/community", opts);
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) {
+      throw new Error(data.error || `HTTP ${res.status}`);
+    }
+    return data;
+  }
+
+  function updateLiveStatusUI() {
+    const pill = $("btn-live-feed");
+    const label = $("live-pill-label");
+    if (!pill || !label) return;
+    const lc = state.liveCommunity;
+    if (lc.enabled) {
+      pill.classList.add("is-live");
+      const nPins = lc.stats?.pins ?? lc.pins.length;
+      label.textContent = window.innerWidth <= 760 ? `EN VIVO (${nPins})` : `EN VIVO · ${nPins} PINES`;
+      pill.title = `Comunidad en vivo conectada · ${nPins} pines compartidos · ${lc.stats?.comments || 0} notas`;
+    } else {
+      pill.classList.remove("is-live");
+      label.textContent = "COMUNIDAD";
+      pill.title = "Actividad comunitaria (modo local en este navegador)";
+    }
+  }
+
+  async function syncLiveCommunity(silent = true) {
+    const isLocalStatic = ["127.0.0.1", "localhost"].includes(window.location.hostname);
+    if (isLocalStatic && window.location.port === "8767") {
+      updateLiveStatusUI();
+      return;
+    }
+    try {
+      const data = await communityApi(null);
+      if (data && data.live) {
+        state.liveCommunity = {
+          enabled: true,
+          pins: Array.isArray(data.pins) ? data.pins : [],
+          votes: data.votes && typeof data.votes === "object" ? data.votes : {},
+          comments: data.comments && typeof data.comments === "object" ? data.comments : {},
+          activity: Array.isArray(data.activity) ? data.activity : [],
+          stats: data.stats || { pins: (data.pins || []).length, comments: 0, totalVotes: 0 },
+          syncedAt: data.syncedAt || new Date().toISOString(),
+        };
+        rebuildMergedMarkers();
+        renderCategoryFilters();
+        renderMarkers();
+        if (state.selectedMarkerId && !$("inspector").classList.contains("hidden")) {
+          openInspector(state.selectedMarkerId, false);
+        }
+        if (!$("community-modal-backdrop").classList.contains("hidden")) {
+          renderCommunityModal();
+        }
+        updateLiveStatusUI();
+        if (!silent) toast(`Comunidad sincronizada (${state.liveCommunity.pins.length} pines compartidos).`);
+      } else {
+        state.liveCommunity.enabled = false;
+        updateLiveStatusUI();
+      }
+    } catch (_) {
+      state.liveCommunity.enabled = false;
+      updateLiveStatusUI();
+    }
+  }
+
   function rebuildMergedMarkers() {
     const delSet = new Set(state.userPins.deleted || []);
+    const lc = state.liveCommunity;
+    const livePinsById = new Map((lc.pins || []).map((p) => [p.id, p]));
     const merged = [];
 
+    const enrichWithCommunity = (raw, isBase) => {
+      const ov = !lc.enabled || isBase ? state.userPins.overrides?.[raw.id] : null;
+      const m = ov ? { ...raw, ...ov } : { ...raw };
+      const liveVoteDelta = Number(lc.votes?.[raw.id] || 0);
+      const localVoteDelta = lc.enabled ? 0 : Number(state.userPins.votes?.[raw.id] || 0);
+      m.votes = Number(m.votes || 0) + liveVoteDelta + localVoteDelta;
+
+      const liveComms = lc.comments?.[raw.id] || [];
+      const localComms = lc.enabled ? [] : (state.userPins.comments?.[raw.id] || []);
+      m.comments = [...(raw.comments || []), ...liveComms, ...localComms];
+      return m;
+    };
+
     for (const base of state.baseMarkers) {
-      if (delSet.has(base.id)) continue;
-      const ov = state.userPins.overrides?.[base.id];
-      const m = ov ? { ...base, ...ov } : { ...base };
-      const extraVotes = Number(state.userPins.votes?.[base.id] || 0);
-      m.votes = Number(m.votes || 0) + extraVotes;
-      const extraComms = state.userPins.comments?.[base.id] || [];
-      m.comments = [...(base.comments || []), ...extraComms];
-      merged.push(m);
+      if (!lc.enabled && delSet.has(base.id)) continue;
+      merged.push(enrichWithCommunity(base, true));
+    }
+
+    for (const lp of lc.pins || []) {
+      merged.push(enrichWithCommunity({ ...lp, isCommunity: true }, false));
     }
 
     for (const added of state.userPins.added || []) {
-      if (delSet.has(added.id)) continue;
-      const ov = state.userPins.overrides?.[added.id];
-      const m = ov ? { ...added, ...ov } : { ...added };
-      const extraVotes = Number(state.userPins.votes?.[added.id] || 0);
-      m.votes = Number(m.votes || 0) + extraVotes;
-      const extraComms = state.userPins.comments?.[added.id] || [];
-      m.comments = [...(added.comments || []), ...extraComms];
-      merged.push(m);
+      if (delSet.has(added.id) || livePinsById.has(added.id)) continue;
+      merged.push(enrichWithCommunity({ ...added, isCommunity: true, isMine: true }, false));
     }
 
     state.markers = merged;
@@ -488,6 +600,19 @@
       if (qSearch) {
         openGlobalSearch(qSearch);
       }
+
+      // Connect to shared live community DB & auto-refresh every 60s when visible
+      syncLiveCommunity(true);
+      setInterval(() => {
+        if (state.liveCommunity.enabled && document.visibilityState === "visible") {
+          syncLiveCommunity(true);
+        }
+      }, 60000);
+
+      // Register PWA Service Worker for fast mobile launch
+      if ("serviceWorker" in navigator && window.location.protocol === "https:") {
+        navigator.serviceWorker.register("/sw.js").catch(() => {});
+      }
     } catch (err) {
       console.error(err);
       toast(`Error al inicializar la guía: ${err.message}`, true);
@@ -546,9 +671,18 @@
   // =========================================================================
   // VIEW SWITCHING
   // =========================================================================
+  function updateMobileBackdrop() {
+    const bd = $("mobile-backdrop");
+    if (!bd) return;
+    const isMob = window.innerWidth <= 760;
+    const sidebarOpen = !$("sidebar").classList.contains("collapsed");
+    const inspOpen = !$("inspector").classList.contains("hidden");
+    bd.classList.toggle("hidden", !(isMob && (sidebarOpen || inspOpen)));
+  }
+
   function switchView(viewName) {
     state.activeView = viewName;
-    document.querySelectorAll(".nav-tab").forEach((btn) => {
+    document.querySelectorAll(".nav-tab, .mob-tab").forEach((btn) => {
       const active = btn.dataset.view === viewName;
       btn.classList.toggle("active", active);
       btn.setAttribute("aria-selected", String(active));
@@ -556,6 +690,11 @@
     document.querySelectorAll(".view-section").forEach((sec) => {
       sec.classList.toggle("active", sec.id === `view-${viewName}`);
     });
+    if (viewName !== "map" && window.innerWidth <= 760) {
+      $("sidebar").classList.add("collapsed");
+      $("inspector").classList.add("hidden");
+      updateMobileBackdrop();
+    }
     if (viewName === "map") {
       requestAnimationFrame(() => applyTransform());
     } else if (viewName === "events" && state.highlightedEventId) {
@@ -878,8 +1017,9 @@
     return getMapMarkers().filter((m) => {
       if (!state.enabledCategories.has(m.category)) return false;
       if (state.hideFound && state.foundMarkers.has(m.id)) return false;
+      if (state.onlyCommunity && !m.isCommunity) return false;
       if (q) {
-        const hay = norm(`${m.title} ${m.region} ${m.description} ${m.howTo || ""} ${CATEGORIES[m.category]?.label || ""}`);
+        const hay = norm(`${m.title} ${m.region} ${m.description} ${m.howTo || ""} ${m.author || ""} ${CATEGORIES[m.category]?.label || ""}`);
         if (!hay.includes(q)) return false;
       }
       return true;
@@ -1011,12 +1151,20 @@
       if (linkedEvent.chapter) badges.push(`<span class="badge verified">${esc(linkedEvent.chapter)}</span>`);
       if (linkedEvent.character) badges.push(`<span class="badge">${esc(linkedEvent.character)}</span>`);
       if (linkedEvent.missable) badges.push(`<span class="ev-pill missable">Perdible</span>`);
+    } else if (m.isCommunity) {
+      badges.push(`<span class="badge live-community">${state.liveCommunity.enabled ? "Comunidad en Vivo" : "Pin Comunitario"}</span>`);
     } else {
       if (m.verified) badges.push(`<span class="badge verified">Guía Oficial</span>`);
       else badges.push(`<span class="badge">Pin Comunitario</span>`);
     }
     if (isFound) badges.push(`<span class="badge found">Encontrado</span>`);
     $("insp-badges").innerHTML = badges.join("");
+
+    // Show Delete only when permitted (any pin in local mode; own community pins in live mode)
+    const canDelete = !state.liveCommunity.enabled || (m.isCommunity && m.isMine);
+    const canEdit = !state.liveCommunity.enabled || !m.isCommunity || m.isMine;
+    $("btn-insp-delete").classList.toggle("hidden", !canDelete);
+    $("btn-insp-edit").classList.toggle("hidden", !canEdit);
 
     const howtoBox = $("insp-howto-box");
     const evGuideEl = $("insp-event-guide");
@@ -1070,6 +1218,7 @@
     if (window.innerWidth <= 860) {
       $("sidebar").classList.add("collapsed");
     }
+    updateMobileBackdrop();
     renderMarkers();
   }
 
@@ -1098,6 +1247,7 @@
   function closeInspector() {
     state.selectedMarkerId = null;
     $("inspector").classList.add("hidden");
+    updateMobileBackdrop();
     renderMarkers();
   }
 
@@ -1166,6 +1316,44 @@
     };
 
     try {
+      if (state.liveCommunity.enabled) {
+        if (editId) {
+          if (editId.startsWith("com-")) {
+            const res = await communityApi({ action: "update_pin", id: editId, ...payload });
+            const idx = state.liveCommunity.pins.findIndex((p) => p.id === editId);
+            if (idx >= 0) state.liveCommunity.pins[idx] = res.marker;
+            rebuildMergedMarkers();
+            toast("Marcador comunitario actualizado en vivo.");
+            closePinModal();
+            renderCategoryFilters();
+            openInspector(editId, false);
+            return;
+          }
+          // Personal local override on official pin
+          state.userPins.overrides[editId] = { ...(state.userPins.overrides[editId] || {}), ...payload };
+          saveLocalUserPins();
+          rebuildMergedMarkers();
+          toast("Ajuste personal guardado en tu navegador.");
+          closePinModal();
+          renderCategoryFilters();
+          openInspector(editId, false);
+          return;
+        }
+        const res = await communityApi({ action: "create_pin", ...payload });
+        state.liveCommunity.pins.unshift(res.marker);
+        if (res.activity) state.liveCommunity.activity.unshift(res.activity);
+        state.liveCommunity.stats.pins = state.liveCommunity.pins.length;
+        updateLiveStatusUI();
+        rebuildMergedMarkers();
+        state.enabledCategories.add(res.marker.category);
+        toast("Pin compartido en vivo con toda la comunidad.");
+        closePinModal();
+        setPlacementMode(false);
+        renderCategoryFilters();
+        openInspector(res.marker.id, false);
+        return;
+      }
+
       if (state.hasLocalApi) {
         if (editId) {
           const res = await api(`/api/markers/${encodeURIComponent(editId)}`, {
@@ -1773,6 +1961,93 @@
   }
 
   // =========================================================================
+  // LIVE COMMUNITY ACTIVITY MODAL
+  // =========================================================================
+  function openCommunityModal() {
+    $("community-modal-backdrop").classList.remove("hidden");
+    renderCommunityModal();
+    if (state.liveCommunity.enabled) {
+      syncLiveCommunity(true);
+    }
+  }
+
+  function closeCommunityModal() {
+    $("community-modal-backdrop").classList.add("hidden");
+  }
+
+  function formatRelTime(isoStr) {
+    if (!isoStr) return "";
+    const diffSec = Math.max(0, Math.floor((Date.now() - new Date(isoStr).getTime()) / 1000));
+    if (diffSec < 60) return "ahora";
+    if (diffSec < 3600) return `hace ${Math.floor(diffSec / 60)}m`;
+    if (diffSec < 86400) return `hace ${Math.floor(diffSec / 3600)}h`;
+    return isoStr.slice(0, 10);
+  }
+
+  function renderCommunityModal() {
+    const lc = state.liveCommunity;
+    const statusEl = $("community-modal-status");
+    const statsRow = $("community-stats-row");
+    const feedCount = $("community-feed-count");
+    const listEl = $("community-feed-list");
+
+    const localAdded = state.userPins.added || [];
+    const pinCount = lc.enabled ? (lc.stats?.pins ?? lc.pins.length) : localAdded.length;
+    const noteCount = lc.enabled
+      ? (lc.stats?.comments || 0)
+      : Object.values(state.userPins.comments || {}).reduce((acc, arr) => acc + arr.length, 0);
+    const voteCount = lc.enabled
+      ? (lc.stats?.totalVotes || 0)
+      : Object.values(state.userPins.votes || {}).reduce((acc, n) => acc + Number(n || 0), 0);
+
+    statusEl.textContent = lc.enabled
+      ? `En vivo · Sincronizado ${lc.syncedAt ? formatRelTime(lc.syncedAt) : "ahora"}`
+      : "Modo local (se guarda en este navegador)";
+
+    statsRow.innerHTML = `
+      <div class="rm-stat"><span class="rm-stat-k">PINES COMUNIDAD</span><span class="rm-stat-v">${pinCount}</span></div>
+      <div class="rm-stat"><span class="rm-stat-k">NOTAS COMPARTIDAS</span><span class="rm-stat-v">${noteCount}</span></div>
+      <div class="rm-stat"><span class="rm-stat-k">VOTOS EN VIVO</span><span class="rm-stat-v">${voteCount}</span></div>
+    `;
+
+    const items = lc.enabled ? (lc.activity || []) : localAdded.map((p) => ({
+      type: "pin",
+      markerId: p.id,
+      title: p.title,
+      region: p.region,
+      author: p.author || "Jugador",
+      blip: p.blip || "blip_pin",
+      createdAt: p.createdAt,
+    }));
+
+    feedCount.textContent = String(items.length);
+    if (!items.length) {
+      listEl.innerHTML = `<div class="empty-state">Aún no hay actividad reciente. ¡Sé el primero en compartir un pin o una nota en Leonida!</div>`;
+      return;
+    }
+
+    listEl.innerHTML = items
+      .map((a) => {
+        const isPin = a.type === "pin";
+        const icon = isPin ? blipUrl(a.blip || "blip_pin") : blipUrl("blip_contact");
+        const headline = isPin
+          ? `${esc(a.author || "Explorador")} añadió "${esc(a.title)}"`
+          : `${esc(a.author || "Explorador")} comentó en "${esc(a.title)}"`;
+        const sub = isPin ? (a.region || "Leonida") : a.text || "";
+        return `
+          <button type="button" class="community-feed-item" data-feed-marker="${esc(a.markerId)}">
+            <img src="${icon}" alt="" class="community-feed-icon" />
+            <span class="community-feed-main">
+              <span class="community-feed-title">${headline}</span>
+              <span class="community-feed-sub">${esc(sub)}</span>
+            </span>
+            <span class="community-feed-time">${esc(formatRelTime(a.createdAt))}</span>
+          </button>`;
+      })
+      .join("");
+  }
+
+  // =========================================================================
   // GLOBAL INSTANT SEARCH COMMAND PALETTE (CTRL+K)
   // =========================================================================
   const QUICK_SEARCH_CHIPS = [
@@ -2101,8 +2376,32 @@
   // EVENT BINDINGS (INCLUDING 2-FINGER TOUCH PINCH-TO-ZOOM)
   // =========================================================================
   function bindEvents() {
-    document.querySelectorAll(".nav-tab").forEach((btn) => {
+    document.querySelectorAll(".nav-tab, .mob-tab").forEach((btn) => {
       btn.addEventListener("click", () => switchView(btn.dataset.view));
+    });
+
+    $("mobile-backdrop")?.addEventListener("click", () => {
+      $("sidebar").classList.add("collapsed");
+      if (!$("inspector").classList.contains("hidden")) closeInspector();
+      else updateMobileBackdrop();
+    });
+
+    $("btn-live-feed")?.addEventListener("click", openCommunityModal);
+    $("btn-close-community-modal")?.addEventListener("click", closeCommunityModal);
+    $("community-modal-backdrop")?.addEventListener("click", (e) => {
+      if (e.target === $("community-modal-backdrop")) closeCommunityModal();
+    });
+    $("btn-community-refresh")?.addEventListener("click", () => syncLiveCommunity(false));
+    $("btn-community-add-pin")?.addEventListener("click", () => {
+      closeCommunityModal();
+      if (state.activeView !== "map") switchView("map");
+      setPlacementMode(true);
+    });
+    $("community-feed-list")?.addEventListener("click", (e) => {
+      const btn = e.target.closest("[data-feed-marker]");
+      if (!btn) return;
+      closeCommunityModal();
+      jumpToMarkerOnMap(btn.dataset.feedMarker);
     });
 
     $("btn-add-pin").addEventListener("click", () => {
@@ -2156,6 +2455,10 @@
     });
     $("chk-show-labels").addEventListener("change", (e) => {
       state.showLabels = e.target.checked;
+      renderMarkers();
+    });
+    $("chk-only-community")?.addEventListener("change", (e) => {
+      state.onlyCommunity = e.target.checked;
       renderMarkers();
     });
 
@@ -2226,6 +2529,8 @@
         state.dragging = false;
         const pts = Array.from(state.pointers.values());
         state.lastPinchDist = Math.hypot(pts[1].x - pts[0].x, pts[1].y - pts[0].y);
+        state.lastPinchMidX = (pts[0].x + pts[1].x) / 2;
+        state.lastPinchMidY = (pts[0].y + pts[1].y) / 2;
       }
     });
 
@@ -2234,16 +2539,22 @@
         state.pointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
       }
 
-      // 2-finger pinch zoom on touch screens
+      // 2-finger simultaneous pinch-zoom + smooth pan on mobile/tablet touch screens
       if (state.pointers.size === 2) {
         const pts = Array.from(state.pointers.values());
         const dist = Math.hypot(pts[1].x - pts[0].x, pts[1].y - pts[0].y);
+        const midX = (pts[0].x + pts[1].x) / 2;
+        const midY = (pts[0].y + pts[1].y) / 2;
         if (state.lastPinchDist > 10 && dist > 10) {
-          const midX = (pts[0].x + pts[1].x) / 2;
-          const midY = (pts[0].y + pts[1].y) / 2;
+          if (state.lastPinchMidX || state.lastPinchMidY) {
+            state.tx += midX - state.lastPinchMidX;
+            state.ty += midY - state.lastPinchMidY;
+          }
           zoomAt(midX, midY, dist / state.lastPinchDist);
         }
         state.lastPinchDist = dist;
+        state.lastPinchMidX = midX;
+        state.lastPinchMidY = midY;
         return;
       }
 
@@ -2267,12 +2578,14 @@
       }
       if (state.pointers.size < 2) {
         state.lastPinchDist = 0;
+        state.lastPinchMidX = 0;
+        state.lastPinchMidY = 0;
       }
       if (!state.dragging) return;
       state.dragging = false;
       vp.classList.remove("dragging");
 
-      if (state.dragMoved < 6) {
+      if (state.dragMoved < 8) {
         const pos = clientToMapPercent(e.clientX, e.clientY);
         if (state.placing) {
           const reticle = $("placement-reticle");
@@ -2283,6 +2596,16 @@
         } else if (state.measuring && pos.inside) {
           state.routePoints.push({ x: pos.x, y: pos.y });
           renderRoute();
+        } else if (e.pointerType === "touch") {
+          const now = Date.now();
+          if (now - state.lastTapTime < 320 && Math.hypot(e.clientX - state.lastTapX, e.clientY - state.lastTapY) < 42) {
+            zoomAt(e.clientX, e.clientY, 1.75);
+            state.lastTapTime = 0;
+          } else {
+            state.lastTapTime = now;
+            state.lastTapX = e.clientX;
+            state.lastTapY = e.clientY;
+          }
         }
       }
     };
@@ -2336,7 +2659,12 @@
       $("map-pins-layer").classList.toggle("pins-hidden", !state.showPins);
     });
     $("btn-toggle-sidebar").addEventListener("click", () => {
+      const opening = $("sidebar").classList.contains("collapsed");
       $("sidebar").classList.toggle("collapsed");
+      if (opening && window.innerWidth <= 760 && !$("inspector").classList.contains("hidden")) {
+        closeInspector();
+      }
+      updateMobileBackdrop();
     });
 
     // Inspector actions
@@ -2385,6 +2713,17 @@
       const mid = state.selectedMarkerId;
       if (!mid) return;
       try {
+        if (state.liveCommunity.enabled) {
+          const res = await communityApi({ action: "vote", markerId: mid });
+          state.liveCommunity.votes[mid] = Number(res.votesDelta || 0);
+          if (!res.alreadyVoted) {
+            state.liveCommunity.stats.totalVotes = Number(state.liveCommunity.stats.totalVotes || 0) + 1;
+          }
+          rebuildMergedMarkers();
+          openInspector(mid, false);
+          toast(res.alreadyVoted ? "Ya habías votado por esta ubicación." : "Voto registrado en vivo.");
+          return;
+        }
         if (state.hasLocalApi) {
           const res = await api(`/api/markers/${encodeURIComponent(mid)}/vote`, { method: "POST" });
           const idx = state.markers.findIndex((x) => x.id === mid);
@@ -2411,6 +2750,23 @@
       if (!m) return;
       if (!window.confirm(`¿Eliminar el marcador "${m.title}"?`)) return;
       try {
+        if (state.liveCommunity.enabled) {
+          if (m.isCommunity && m.isMine) {
+            await communityApi({ action: "delete_pin", id: m.id });
+            state.liveCommunity.pins = state.liveCommunity.pins.filter((p) => p.id !== m.id);
+            state.liveCommunity.stats.pins = state.liveCommunity.pins.length;
+            updateLiveStatusUI();
+            rebuildMergedMarkers();
+            state.foundMarkers.delete(m.id);
+            await persistProgress();
+            closeInspector();
+            renderCategoryFilters();
+            toast("Marcador comunitario eliminado en vivo.");
+            return;
+          }
+          toast("Los marcadores oficiales de la guía no se pueden borrar del mapa compartido.", true);
+          return;
+        }
         if (state.hasLocalApi) {
           await api(`/api/markers/${encodeURIComponent(m.id)}`, { method: "DELETE" });
           state.markers = state.markers.filter((x) => x.id !== m.id);
@@ -2434,11 +2790,30 @@
       e.preventDefault();
       const mid = state.selectedMarkerId;
       if (!mid) return;
+      const mk = state.markers.find((x) => x.id === mid);
       const author = $("comment-author").value.trim() || localStorage.getItem("gta6_author") || "Jugador";
       const text = $("comment-text").value.trim();
       if (!text) return;
       localStorage.setItem("gta6_author", author);
       try {
+        if (state.liveCommunity.enabled) {
+          const res = await communityApi({
+            action: "comment",
+            markerId: mid,
+            markerTitle: mk?.title || mid,
+            author,
+            text,
+          });
+          state.liveCommunity.comments[mid] = state.liveCommunity.comments[mid] || [];
+          state.liveCommunity.comments[mid].push(res.comment);
+          if (res.activity) state.liveCommunity.activity.unshift(res.activity);
+          state.liveCommunity.stats.comments = Number(state.liveCommunity.stats.comments || 0) + 1;
+          rebuildMergedMarkers();
+          $("comment-text").value = "";
+          openInspector(mid, false);
+          toast("Nota publicada en vivo para toda la comunidad.");
+          return;
+        }
         if (state.hasLocalApi) {
           const res = await api(`/api/markers/${encodeURIComponent(mid)}/comments`, {
             method: "POST",
@@ -2709,6 +3084,7 @@
 
       if (e.key === "Escape") {
         if (!$("global-search-backdrop").classList.contains("hidden")) closeGlobalSearch();
+        else if (!$("community-modal-backdrop").classList.contains("hidden")) closeCommunityModal();
         else if (!$("lightbox").classList.contains("hidden")) closeLightbox();
         else if (!$("pin-modal-backdrop").classList.contains("hidden")) closePinModal();
         else if (state.placing) setPlacementMode(false);
@@ -2741,6 +3117,8 @@
       }
     });
     window.addEventListener("resize", () => {
+      updateLiveStatusUI();
+      updateMobileBackdrop();
       if (state.activeView === "map") applyTransform();
     });
   }
