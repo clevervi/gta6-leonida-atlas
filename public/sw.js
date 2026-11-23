@@ -3,7 +3,7 @@
    - /extracted/* -> Cache-first (immutable images & maps for instant mobile load)
    - Shell & JSON -> Network-first with cache fallback when offline
 */
-const CACHE_NAME = "leonida-atlas-v3";
+const CACHE_NAME = "leonida-atlas-v4";
 const CORE_SHELL = [
   "/",
   "/styles.css",

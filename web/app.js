@@ -155,16 +155,21 @@
     showLabels: false,
     showPins: true,
 
-    // Map viewport transform
+    // Map viewport transform & canvas tile engine
     imgW: 5395,
     imgH: 7521,
     pxPerMile: 600,
+    vpW: 960,
+    vpH: 640,
+    dpr: 1,
+    vpRect: null,
     mapInitialized: false,
     scale: 0.1,
     fitScale: 0.1,
     tx: 0,
     ty: 0,
-    animTimer: null,
+    rafId: 0,
+    tweenRafId: 0,
     wordmarkTimer: null,
     dragging: false,
     minimapDragging: false,
@@ -181,18 +186,17 @@
     lastTapX: 0,
     lastTapY: 0,
     pendingDeepLink: null,
+    pinNodes: [],
+    reticleCoords: null,
+    lastZoomText: "",
+    lastGridText: "",
+    lastCoordsText: "",
+    hoverClientX: null,
+    hoverClientY: null,
+    hoverRafId: 0,
 
-    // Shared Live Community DB state
-    liveCommunity: {
-      enabled: false,
-      pins: [],
-      votes: {},
-      comments: {},
-      activity: [],
-      stats: { pins: 0, comments: 0, totalVotes: 0 },
-      syncedAt: null,
-    },
-    onlyCommunity: false,
+    // Lazy-rendered secondary tabs (slashes initial DOM size & RAM by ~85%)
+    renderedViews: new Set(["map"]),
 
     // Placement & GPS Route Measure modes
     placing: false,
@@ -360,125 +364,30 @@
     } catch (_) { /* noop */ }
   }
 
-  const LS_CLIENT_TOKEN = "gta6_client_token_v1";
-
-  function getClientToken() {
-    try {
-      let tok = localStorage.getItem(LS_CLIENT_TOKEN);
-      if (!tok) {
-        tok = (crypto.randomUUID ? crypto.randomUUID() : `cli-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`);
-        localStorage.setItem(LS_CLIENT_TOKEN, tok);
-      }
-      return tok;
-    } catch (_) {
-      return "anon-client";
-    }
-  }
-
-  async function communityApi(payload = null) {
-    const opts = {
-      method: payload ? "POST" : "GET",
-      headers: {
-        "Content-Type": "application/json",
-        "X-Client-Token": getClientToken(),
-      },
-    };
-    if (payload) opts.body = JSON.stringify(payload);
-    const res = await fetch("/api/community", opts);
-    const data = await res.json().catch(() => ({}));
-    if (!res.ok) {
-      throw new Error(data.error || `HTTP ${res.status}`);
-    }
-    return data;
-  }
-
-  function updateLiveStatusUI() {
-    const pill = $("btn-live-feed");
-    const label = $("live-pill-label");
-    if (!pill || !label) return;
-    const lc = state.liveCommunity;
-    if (lc.enabled) {
-      pill.classList.add("is-live");
-      const nPins = lc.stats?.pins ?? lc.pins.length;
-      label.textContent = window.innerWidth <= 760 ? `EN VIVO (${nPins})` : `EN VIVO · ${nPins} PINES`;
-      pill.title = `Comunidad en vivo conectada · ${nPins} pines compartidos · ${lc.stats?.comments || 0} notas`;
-    } else {
-      pill.classList.remove("is-live");
-      label.textContent = "COMUNIDAD";
-      pill.title = "Actividad comunitaria (modo local en este navegador)";
-    }
-  }
-
-  async function syncLiveCommunity(silent = true) {
-    const isLocalStatic = ["127.0.0.1", "localhost"].includes(window.location.hostname);
-    if (isLocalStatic && window.location.port === "8767") {
-      updateLiveStatusUI();
-      return;
-    }
-    try {
-      const data = await communityApi(null);
-      if (data && data.live) {
-        state.liveCommunity = {
-          enabled: true,
-          pins: Array.isArray(data.pins) ? data.pins : [],
-          votes: data.votes && typeof data.votes === "object" ? data.votes : {},
-          comments: data.comments && typeof data.comments === "object" ? data.comments : {},
-          activity: Array.isArray(data.activity) ? data.activity : [],
-          stats: data.stats || { pins: (data.pins || []).length, comments: 0, totalVotes: 0 },
-          syncedAt: data.syncedAt || new Date().toISOString(),
-        };
-        rebuildMergedMarkers();
-        renderCategoryFilters();
-        renderMarkers();
-        if (state.selectedMarkerId && !$("inspector").classList.contains("hidden")) {
-          openInspector(state.selectedMarkerId, false);
-        }
-        if (!$("community-modal-backdrop").classList.contains("hidden")) {
-          renderCommunityModal();
-        }
-        updateLiveStatusUI();
-        if (!silent) toast(`Comunidad sincronizada (${state.liveCommunity.pins.length} pines compartidos).`);
-      } else {
-        state.liveCommunity.enabled = false;
-        updateLiveStatusUI();
-      }
-    } catch (_) {
-      state.liveCommunity.enabled = false;
-      updateLiveStatusUI();
-    }
-  }
-
   function rebuildMergedMarkers() {
     const delSet = new Set(state.userPins.deleted || []);
-    const lc = state.liveCommunity;
-    const livePinsById = new Map((lc.pins || []).map((p) => [p.id, p]));
     const merged = [];
 
-    const enrichWithCommunity = (raw, isBase) => {
-      const ov = !lc.enabled || isBase ? state.userPins.overrides?.[raw.id] : null;
-      const m = ov ? { ...raw, ...ov } : { ...raw };
-      const liveVoteDelta = Number(lc.votes?.[raw.id] || 0);
-      const localVoteDelta = lc.enabled ? 0 : Number(state.userPins.votes?.[raw.id] || 0);
-      m.votes = Number(m.votes || 0) + liveVoteDelta + localVoteDelta;
-
-      const liveComms = lc.comments?.[raw.id] || [];
-      const localComms = lc.enabled ? [] : (state.userPins.comments?.[raw.id] || []);
-      m.comments = [...(raw.comments || []), ...liveComms, ...localComms];
-      return m;
-    };
-
     for (const base of state.baseMarkers) {
-      if (!lc.enabled && delSet.has(base.id)) continue;
-      merged.push(enrichWithCommunity(base, true));
-    }
-
-    for (const lp of lc.pins || []) {
-      merged.push(enrichWithCommunity({ ...lp, isCommunity: true }, false));
+      if (delSet.has(base.id)) continue;
+      const ov = state.userPins.overrides?.[base.id];
+      const m = ov ? { ...base, ...ov } : { ...base };
+      const extraVotes = Number(state.userPins.votes?.[base.id] || 0);
+      m.votes = Number(m.votes || 0) + extraVotes;
+      const extraComms = state.userPins.comments?.[base.id] || [];
+      m.comments = [...(base.comments || []), ...extraComms];
+      merged.push(m);
     }
 
     for (const added of state.userPins.added || []) {
-      if (delSet.has(added.id) || livePinsById.has(added.id)) continue;
-      merged.push(enrichWithCommunity({ ...added, isCommunity: true, isMine: true }, false));
+      if (delSet.has(added.id)) continue;
+      const ov = state.userPins.overrides?.[added.id];
+      const m = ov ? { ...added, ...ov } : { ...added };
+      const extraVotes = Number(state.userPins.votes?.[added.id] || 0);
+      m.votes = Number(m.votes || 0) + extraVotes;
+      const extraComms = state.userPins.comments?.[added.id] || [];
+      m.comments = [...(added.comments || []), ...extraComms];
+      merged.push(m);
     }
 
     state.markers = merged;
@@ -584,12 +493,6 @@
       };
 
       loadFullLeonidaMap();
-      renderGuide100Box();
-      renderEventsView();
-      renderGuideView();
-      renderCollectiblesView();
-      renderArsenalView();
-      renderBlipsView();
       updateGlobalProgressCounters();
 
       if (qView && ["map", "events", "guide", "collectibles", "arsenal", "blips"].includes(qView)) {
@@ -601,15 +504,7 @@
         openGlobalSearch(qSearch);
       }
 
-      // Connect to shared live community DB & auto-refresh every 60s when visible
-      syncLiveCommunity(true);
-      setInterval(() => {
-        if (state.liveCommunity.enabled && document.visibilityState === "visible") {
-          syncLiveCommunity(true);
-        }
-      }, 60000);
-
-      // Register PWA Service Worker for fast mobile launch
+      // Register PWA Service Worker for instant cached repeat opens
       if ("serviceWorker" in navigator && window.location.protocol === "https:") {
         navigator.serviceWorker.register("/sw.js").catch(() => {});
       }
@@ -680,6 +575,23 @@
     bd.classList.toggle("hidden", !(isMob && (sidebarOpen || inspOpen)));
   }
 
+  function ensureViewRendered(viewName) {
+    if (state.renderedViews.has(viewName)) return;
+    state.renderedViews.add(viewName);
+    if (viewName === "events") {
+      renderGuide100Box();
+      renderEventsView();
+    } else if (viewName === "guide") {
+      renderGuideView();
+    } else if (viewName === "collectibles") {
+      renderCollectiblesView();
+    } else if (viewName === "arsenal") {
+      renderArsenalView();
+    } else if (viewName === "blips") {
+      renderBlipsView();
+    }
+  }
+
   function switchView(viewName) {
     state.activeView = viewName;
     document.querySelectorAll(".nav-tab, .mob-tab").forEach((btn) => {
@@ -695,8 +607,12 @@
       $("inspector").classList.add("hidden");
       updateMobileBackdrop();
     }
+    ensureViewRendered(viewName);
     if (viewName === "map") {
-      requestAnimationFrame(() => applyTransform());
+      requestAnimationFrame(() => {
+        syncCanvasSize();
+        scheduleRender();
+      });
     } else if (viewName === "events" && state.highlightedEventId) {
       requestAnimationFrame(() => {
         const card = document.querySelector(`[data-event-card="${CSS.escape(state.highlightedEventId)}"]`);
@@ -725,16 +641,306 @@
     renderCategoryFilters();
     switchView("map");
     requestAnimationFrame(() => {
+      syncCanvasSize();
       openInspector(mk.id, true, 4.8, true);
       if (mk.wordmark) showZoneWordmark(mk.wordmark);
     });
   }
 
   // =========================================================================
-  // FULL LEONIDA MAP LOADING, REGION QUICK-JUMP & PAN/ZOOM
+  // HIGH-PERFORMANCE TILE PYRAMID CANVAS ENGINE + SCREEN-SPACE CULLED PINS
   // =========================================================================
+  const MAX_CACHED_TILES = 44;
+  const tileCache = new Map(); // url -> { img, ready, failed }
+  const baseCache = new Map(); // url -> { img, ready }
+  let mapCtx = null;
+
   function getActiveMap() {
     return (state.manifest.maps || []).find((m) => m.id === state.activeMapId) || state.manifest.maps[0];
+  }
+
+  function getBaseImage(url) {
+    if (!url) return null;
+    let entry = baseCache.get(url);
+    if (!entry) {
+      const img = new Image();
+      img.decoding = "async";
+      entry = { img, ready: false };
+      img.onload = () => {
+        entry.ready = true;
+        scheduleRender();
+      };
+      img.src = url;
+      baseCache.set(url, entry);
+    }
+    return entry.ready ? entry.img : null;
+  }
+
+  function getTileImage(url, cacheOnly = false) {
+    let entry = tileCache.get(url);
+    if (entry) {
+      // Touch LRU position
+      tileCache.delete(url);
+      tileCache.set(url, entry);
+      return entry.ready ? entry.img : null;
+    }
+    if (cacheOnly) return null;
+    const img = new Image();
+    img.decoding = "async";
+    entry = { img, ready: false, failed: false };
+    img.onload = () => {
+      entry.ready = true;
+      scheduleRender();
+    };
+    img.onerror = () => {
+      entry.failed = true;
+    };
+    img.src = url;
+    tileCache.set(url, entry);
+
+    while (tileCache.size > MAX_CACHED_TILES) {
+      const oldestKey = tileCache.keys().next().value;
+      tileCache.delete(oldestKey);
+    }
+    return null;
+  }
+
+  function syncCanvasSize() {
+    const vp = $("map-viewport");
+    const canvas = $("map-canvas");
+    if (!vp || !canvas) return;
+    const rect = vp.getBoundingClientRect();
+    const w = Math.max(1, Math.round(rect.width || vp.clientWidth || 960));
+    const h = Math.max(1, Math.round(rect.height || vp.clientHeight || 640));
+    const dpr = Math.min(window.devicePixelRatio || 1, 2);
+    state.vpW = w;
+    state.vpH = h;
+    state.dpr = dpr;
+    state.vpRect = rect;
+
+    const bw = Math.round(w * dpr);
+    const bh = Math.round(h * dpr);
+    if (canvas.width !== bw || canvas.height !== bh) {
+      canvas.width = bw;
+      canvas.height = bh;
+    }
+    if (!mapCtx) {
+      mapCtx = canvas.getContext("2d", { alpha: false });
+    }
+  }
+
+  function cancelCameraTween() {
+    if (state.tweenRafId) {
+      cancelAnimationFrame(state.tweenRafId);
+      state.tweenRafId = 0;
+    }
+  }
+
+  function animateCameraTo(targetScale, targetTx, targetTy, animate = true) {
+    cancelCameraTween();
+    if (!animate) {
+      state.scale = targetScale;
+      state.tx = targetTx;
+      state.ty = targetTy;
+      scheduleRender();
+      return;
+    }
+    const startScale = state.scale;
+    const startTx = state.tx;
+    const startTy = state.ty;
+    const startTime = performance.now();
+    const duration = 340;
+
+    const step = (now) => {
+      const t = Math.min(1, (now - startTime) / duration);
+      const ease = 1 - Math.pow(1 - t, 3);
+      state.scale = startScale + (targetScale - startScale) * ease;
+      state.tx = startTx + (targetTx - startTx) * ease;
+      state.ty = startTy + (targetTy - startTy) * ease;
+      renderMapFrame();
+      if (t < 1) {
+        state.tweenRafId = requestAnimationFrame(step);
+      } else {
+        state.tweenRafId = 0;
+      }
+    };
+    state.tweenRafId = requestAnimationFrame(step);
+  }
+
+  function scheduleRender() {
+    if (state.rafId) return;
+    state.rafId = requestAnimationFrame(() => {
+      state.rafId = 0;
+      renderMapFrame();
+    });
+  }
+
+  function drawTileLevel(lv, visX0, visY0, visX1, visY1, tx, ty, scale, cacheOnly = false) {
+    const { cols, rows, tpl } = lv;
+    const tileW = state.imgW / cols;
+    const tileH = state.imgH / rows;
+    const c0 = Math.max(0, Math.floor(visX0 / tileW));
+    const c1 = Math.min(cols - 1, Math.floor(visX1 / tileW));
+    const r0 = Math.max(0, Math.floor(visY0 / tileH));
+    const r1 = Math.min(rows - 1, Math.floor(visY1 / tileH));
+
+    for (let r = r0; r <= r1; r++) {
+      const wy0 = (r * state.imgH) / rows;
+      const wy1 = ((r + 1) * state.imgH) / rows;
+      const dy = ty + wy0 * scale;
+      const dh = (wy1 - wy0) * scale + 0.65;
+      for (let c = c0; c <= c1; c++) {
+        const url = tpl.replace("{c}", String(c)).replace("{r}", String(r));
+        const img = getTileImage(url, cacheOnly);
+        if (!img) continue;
+        const wx0 = (c * state.imgW) / cols;
+        const wx1 = ((c + 1) * state.imgW) / cols;
+        const dx = tx + wx0 * scale;
+        const dw = (wx1 - wx0) * scale + 0.65;
+        mapCtx.drawImage(img, dx, dy, dw, dh);
+      }
+    }
+  }
+
+  function drawRouteOnCanvas(tx, ty, scale) {
+    const pts = state.routePoints;
+    if (!pts.length || !mapCtx) return;
+
+    const screenPts = pts.map((p) => ({
+      x: tx + (p.x / 100) * state.imgW * scale,
+      y: ty + (p.y / 100) * state.imgH * scale,
+    }));
+
+    mapCtx.save();
+    if (screenPts.length >= 2) {
+      mapCtx.lineCap = "round";
+      mapCtx.lineJoin = "round";
+      // Dark matte under-stroke
+      mapCtx.beginPath();
+      mapCtx.moveTo(screenPts[0].x, screenPts[0].y);
+      for (let i = 1; i < screenPts.length; i++) {
+        mapCtx.lineTo(screenPts[i].x, screenPts[i].y);
+      }
+      mapCtx.strokeStyle = "rgba(8, 10, 14, 0.85)";
+      mapCtx.lineWidth = 6;
+      mapCtx.stroke();
+
+      // Amber GPS dashed line
+      mapCtx.setLineDash([8, 5]);
+      mapCtx.strokeStyle = "#f0a533";
+      mapCtx.lineWidth = 3;
+      mapCtx.stroke();
+      mapCtx.setLineDash([]);
+    }
+
+    for (let i = 0; i < screenPts.length; i++) {
+      const p = screenPts[i];
+      const fill = i === 0 ? "#34c77b" : i === screenPts.length - 1 ? "#d84363" : "#f0a533";
+      mapCtx.beginPath();
+      mapCtx.arc(p.x, p.y, 5.5, 0, Math.PI * 2);
+      mapCtx.fillStyle = fill;
+      mapCtx.fill();
+      mapCtx.lineWidth = 2;
+      mapCtx.strokeStyle = "#08090c";
+      mapCtx.stroke();
+    }
+    mapCtx.restore();
+  }
+
+  function renderMapFrame() {
+    const m = getActiveMap();
+    if (!m) return;
+    if (!mapCtx || state.vpW <= 1) syncCanvasSize();
+    if (!mapCtx) return;
+
+    const { vpW, vpH, dpr, tx, ty, scale, imgW, imgH } = state;
+
+    // 1. Paint map canvas (GPU-accelerated, ~15 MB VRAM max!)
+    mapCtx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    mapCtx.fillStyle = state.mapTheme === "day" ? "#0b1118" : "#070b12";
+    mapCtx.fillRect(0, 0, vpW, vpH);
+    mapCtx.imageSmoothingEnabled = true;
+    mapCtx.imageSmoothingQuality = "medium";
+
+    const visX0 = Math.max(0, -tx / scale);
+    const visY0 = Math.max(0, -ty / scale);
+    const visX1 = Math.min(imgW, (vpW - tx) / scale);
+    const visY1 = Math.min(imgH, (vpH - ty) / scale);
+
+    if (visX1 > visX0 && visY1 > visY0) {
+      const themeTiles = m.tiles?.[state.mapTheme];
+      if (themeTiles) {
+        const baseImg = getBaseImage(themeTiles.base);
+        if (baseImg) {
+          mapCtx.drawImage(baseImg, tx, ty, imgW * scale, imgH * scale);
+        }
+        const effectiveW = imgW * scale * dpr;
+        const levels = themeTiles.levels || [];
+        let targetIdx = -1;
+        for (let i = 0; i < levels.length; i++) {
+          if (effectiveW >= levels[i].minWidth) targetIdx = i;
+        }
+        // Draw already-cached coarser tiles underneath, only fetch the target detail level
+        for (let i = 0; i <= targetIdx; i++) {
+          drawTileLevel(levels[i], visX0, visY0, visX1, visY1, tx, ty, scale, i < targetIdx);
+        }
+      } else {
+        // Fallback for legacy single-file manifest
+        const fallbackUrl = state.mapTheme === "day" ? (m.dayFile || m.file) : (m.nightFile || m.file);
+        const fullImg = getBaseImage(fallbackUrl);
+        if (fullImg) {
+          mapCtx.drawImage(fullImg, tx, ty, imgW * scale, imgH * scale);
+        }
+      }
+    }
+
+    // 2. Paint GPS Route directly on canvas
+    if (state.routePoints.length) {
+      drawRouteOnCanvas(tx, ty, scale);
+    }
+
+    // 3. Position & cull visible screen-space pins (ZERO CSS var recalcs!)
+    if (state.showPins && state.pinNodes.length) {
+      const pad = 42;
+      for (let i = 0; i < state.pinNodes.length; i++) {
+        const p = state.pinNodes[i];
+        const sx = tx + p.wx * scale;
+        const sy = ty + p.wy * scale;
+        const offscreen = sx < -pad || sx > vpW + pad || sy < -pad || sy > vpH + pad;
+        if (offscreen) {
+          if (!p.culled) {
+            p.el.classList.add("is-culled");
+            p.culled = true;
+          }
+        } else {
+          if (p.culled) {
+            p.el.classList.remove("is-culled");
+            p.culled = false;
+          }
+          p.el.style.transform = `translate3d(${sx.toFixed(1)}px,${sy.toFixed(1)}px,0)`;
+        }
+      }
+    }
+
+    // 4. Placement reticle in screen space
+    if (state.reticleCoords) {
+      const rx = tx + (state.reticleCoords.x / 100) * imgW * scale;
+      const ry = ty + (state.reticleCoords.y / 100) * imgH * scale;
+      $("placement-reticle").style.transform = `translate3d(${rx.toFixed(1)}px,${ry.toFixed(1)}px,0)`;
+    }
+
+    // 5. Update Zoom HUD only when changed + Minimap rect
+    const zoomRatio = scale / Math.max(0.01, state.fitScale);
+    const zText = `${Math.round(zoomRatio * 100)}%`;
+    if (zText !== state.lastZoomText) {
+      state.lastZoomText = zText;
+      $("hud-zoom").textContent = zText;
+    }
+    updateMinimap();
+  }
+
+  function applyTransform() {
+    scheduleRender();
   }
 
   function renderRegionBar() {
@@ -749,23 +955,6 @@
     ).join("");
   }
 
-  function setWorldAnimating(animate) {
-    const world = $("map-world");
-    if (state.animTimer) {
-      clearTimeout(state.animTimer);
-      state.animTimer = null;
-    }
-    if (animate) {
-      world.classList.add("is-animating");
-      state.animTimer = setTimeout(() => {
-        world.classList.remove("is-animating");
-        state.animTimer = null;
-      }, 460);
-    } else {
-      world.classList.remove("is-animating");
-    }
-  }
-
   function applyThemeUI() {
     const m = getActiveMap();
     const isDay = state.mapTheme === "day";
@@ -774,7 +963,7 @@
     $("map-viewport").classList.toggle("day-mode", isDay);
     $("hud-source").textContent = isDay ? "MODO DÍA" : "MODO NOCHE";
     if (m) {
-      $("minimap-img").src = isDay ? (m.minimapDay || m.dayFile) : (m.minimapNight || m.nightFile);
+      $("minimap-img").src = isDay ? (m.minimapDay || m.dayFile || "") : (m.minimapNight || m.nightFile || "");
     }
   }
 
@@ -783,10 +972,8 @@
     if (state.mapTheme === theme) return;
     state.mapTheme = theme;
     localStorage.setItem("gta6_map_theme", theme);
-    const m = getActiveMap();
-    if (!m) return;
     applyThemeUI();
-    $("map-image").src = theme === "day" ? (m.dayFile || m.file) : (m.nightFile || m.file);
+    scheduleRender();
   }
 
   function loadFullLeonidaMap() {
@@ -797,46 +984,42 @@
     state.imgW = m.width || 5395;
     state.imgH = m.height || 7521;
     applyThemeUI();
+    syncCanvasSize();
 
-    const imgEl = $("map-image");
-    imgEl.onload = () => {
-      state.imgW = imgEl.naturalWidth || m.width || 5395;
-      state.imgH = imgEl.naturalHeight || m.height || 7521;
-      const world = $("map-world");
-      world.style.width = `${state.imgW}px`;
-      world.style.height = `${state.imgH}px`;
-      $("route-svg").setAttribute("viewBox", `0 0 ${state.imgW} ${state.imgH}`);
-      applyThemeUI();
-
-      if (!state.mapInitialized) {
-        state.mapInitialized = true;
-        fitMapToViewport(false);
-
-        if (state.pendingDeepLink) {
-          const dl = state.pendingDeepLink;
-          state.pendingDeepLink = null;
-          if (dl.route) {
-            const pts = dl.route.split(";").map((s) => s.split(",").map(Number)).filter((p) => p.length === 2 && Number.isFinite(p[0]) && Number.isFinite(p[1]));
-            if (pts.length) {
-              state.routePoints = pts.map(([x, y]) => ({ x, y }));
-              setMeasureMode(true);
-              renderRoute();
-            }
-          }
-          if (dl.pin && state.markers.some((x) => x.id === dl.pin)) {
-            openInspector(dl.pin, true, dl.zoom || 4.8, false);
-          } else if (dl.region && LEONIDA_REGIONS.some((r) => r.id === dl.region)) {
-            jumpToRegion(dl.region, false);
-          }
-        }
-      } else {
-        updateMinimap();
-      }
-    };
-    imgEl.src = state.mapTheme === "day" ? (m.dayFile || m.file) : (m.nightFile || m.file);
+    // Warm base overview immediately (~220 KB WebP)
+    const themeTiles = m.tiles?.[state.mapTheme];
+    if (themeTiles?.base) getBaseImage(themeTiles.base);
 
     renderCategoryFilters();
     renderMarkers();
+
+    if (!state.mapInitialized) {
+      state.mapInitialized = true;
+      fitMapToViewport(false);
+
+      if (state.pendingDeepLink) {
+        const dl = state.pendingDeepLink;
+        state.pendingDeepLink = null;
+        if (dl.route) {
+          const pts = dl.route
+            .split(";")
+            .map((s) => s.split(",").map(Number))
+            .filter((p) => p.length === 2 && Number.isFinite(p[0]) && Number.isFinite(p[1]));
+          if (pts.length) {
+            state.routePoints = pts.map(([x, y]) => ({ x, y }));
+            setMeasureMode(true);
+            renderRoute();
+          }
+        }
+        if (dl.pin && state.markers.some((x) => x.id === dl.pin)) {
+          openInspector(dl.pin, true, dl.zoom || 4.8, false);
+        } else if (dl.region && LEONIDA_REGIONS.some((r) => r.id === dl.region)) {
+          jumpToRegion(dl.region, false);
+        }
+      }
+    } else {
+      scheduleRender();
+    }
   }
 
   function jumpToRegion(regionId, animate = true) {
@@ -856,51 +1039,33 @@
   }
 
   function fitMapToViewport(animate = false) {
-    const vp = $("map-viewport");
-    const vw = vp.clientWidth || 960;
-    const vh = vp.clientHeight || 640;
+    syncCanvasSize();
     const pad = 16;
-    const scale = Math.min((vw - pad) / state.imgW, (vh - pad) / state.imgH);
-    state.fitScale = Math.max(0.03, scale);
-    state.scale = state.fitScale;
-    state.tx = (vw - state.imgW * state.scale) / 2;
-    state.ty = (vh - state.imgH * state.scale) / 2;
+    const scale = Math.max(0.03, Math.min((state.vpW - pad) / state.imgW, (state.vpH - pad) / state.imgH));
+    state.fitScale = scale;
+    const targetTx = (state.vpW - state.imgW * scale) / 2;
+    const targetTy = (state.vpH - state.imgH * scale) / 2;
     state.activeRegionId = "all";
     renderRegionBar();
-    setWorldAnimating(animate);
-    applyTransform();
+    animateCameraTo(scale, targetTx, targetTy, animate);
   }
 
   function updateMinimap() {
-    const vp = $("map-viewport");
     const rectEl = $("minimap-rect");
-    if (!vp || !rectEl || !state.imgW || !state.imgH) return;
-    const vw = vp.clientWidth || 960;
-    const vh = vp.clientHeight || 640;
+    if (!rectEl || !state.imgW || !state.imgH || state.vpW <= 1) return;
+    if (window.innerWidth <= 760) return; // minimap hidden on mobile
     const leftPct = Math.max(0, Math.min(100, (-state.tx / state.scale / state.imgW) * 100));
     const topPct = Math.max(0, Math.min(100, (-state.ty / state.scale / state.imgH) * 100));
-    const rightPct = Math.max(0, Math.min(100, ((vw - state.tx) / state.scale / state.imgW) * 100));
-    const bottomPct = Math.max(0, Math.min(100, ((vh - state.ty) / state.scale / state.imgH) * 100));
-    rectEl.style.left = `${leftPct.toFixed(2)}%`;
-    rectEl.style.top = `${topPct.toFixed(2)}%`;
-    rectEl.style.width = `${Math.max(4, rightPct - leftPct).toFixed(2)}%`;
-    rectEl.style.height = `${Math.max(4, bottomPct - topPct).toFixed(2)}%`;
-  }
-
-  function applyTransform() {
-    const world = $("map-world");
-    const zoomRatio = state.scale / Math.max(0.01, state.fitScale);
-    const desiredScreenFactor = Math.min(1.12, Math.max(0.62, 0.62 + Math.log2(Math.max(1, zoomRatio)) * 0.145));
-    const invScale = desiredScreenFactor / Math.max(0.01, state.scale);
-    world.style.setProperty("--inv-scale", invScale.toFixed(5));
-    world.style.transform = `translate3d(${state.tx.toFixed(2)}px, ${state.ty.toFixed(2)}px, 0) scale(${state.scale.toFixed(5)})`;
-    const pct = Math.round(zoomRatio * 100);
-    $("hud-zoom").textContent = `${pct}%`;
-    updateMinimap();
+    const rightPct = Math.max(0, Math.min(100, ((state.vpW - state.tx) / state.scale / state.imgW) * 100));
+    const bottomPct = Math.max(0, Math.min(100, ((state.vpH - state.ty) / state.scale / state.imgH) * 100));
+    rectEl.style.left = `${leftPct.toFixed(1)}%`;
+    rectEl.style.top = `${topPct.toFixed(1)}%`;
+    rectEl.style.width = `${Math.max(4, rightPct - leftPct).toFixed(1)}%`;
+    rectEl.style.height = `${Math.max(4, bottomPct - topPct).toFixed(1)}%`;
   }
 
   // =========================================================================
-  // GPS ROUTE & DISTANCE MEASURER
+  // GPS ROUTE & DISTANCE MEASURER (DRAWN DIRECTLY ON CANVAS)
   // =========================================================================
   function setMeasureMode(active) {
     state.measuring = active;
@@ -910,27 +1075,22 @@
     $("btn-measure-route").classList.toggle("is-active", active);
     if (!active) {
       state.routePoints = [];
-      renderRoute();
-    } else {
-      renderRoute();
     }
+    renderRoute();
   }
 
   function renderRoute() {
-    const svg = $("route-svg");
     const pts = state.routePoints;
     if (!pts.length) {
-      svg.innerHTML = "";
       $("route-readout").textContent = "Haz clic en el mapa para trazar puntos y medir distancia";
+      scheduleRender();
       return;
     }
-    const pxPts = pts.map((p) => ({
-      x: (p.x / 100) * state.imgW,
-      y: (p.y / 100) * state.imgH,
-    }));
     let totalPx = 0;
-    for (let i = 1; i < pxPts.length; i++) {
-      totalPx += Math.hypot(pxPts[i].x - pxPts[i - 1].x, pxPts[i].y - pxPts[i - 1].y);
+    for (let i = 1; i < pts.length; i++) {
+      const dx = ((pts[i].x - pts[i - 1].x) / 100) * state.imgW;
+      const dy = ((pts[i].y - pts[i - 1].y) / 100) * state.imgH;
+      totalPx += Math.hypot(dx, dy);
     }
     const miles = totalPx / state.pxPerMile;
     const km = miles * 1.60934;
@@ -939,61 +1099,42 @@
     } else {
       $("route-readout").textContent = `${miles.toFixed(2)} mi · ${km.toFixed(2)} km (${pts.length} puntos)`;
     }
-
-    const polyStr = pxPts.map((p) => `${p.x.toFixed(1)},${p.y.toFixed(1)}`).join(" ");
-    const strokeW = Math.max(12, Math.min(48, 22 / Math.max(0.2, state.scale / state.fitScale)));
-    const rDot = strokeW * 1.05;
-    let html = "";
-    if (pxPts.length >= 2) {
-      html += `<polyline points="${polyStr}" fill="none" stroke="rgba(8,10,14,0.8)" stroke-width="${(strokeW * 1.9).toFixed(1)}" stroke-linecap="round" stroke-linejoin="round" />`;
-      html += `<polyline points="${polyStr}" fill="none" stroke="#f0a533" stroke-width="${strokeW.toFixed(1)}" stroke-linecap="round" stroke-linejoin="round" stroke-dasharray="${(strokeW * 2.2).toFixed(1)} ${(strokeW * 1.2).toFixed(1)}" />`;
-    }
-    pxPts.forEach((p, idx) => {
-      const fill = idx === 0 ? "#34c77b" : idx === pxPts.length - 1 ? "#d84363" : "#f0a533";
-      html += `<circle cx="${p.x.toFixed(1)}" cy="${p.y.toFixed(1)}" r="${rDot.toFixed(1)}" fill="${fill}" stroke="#08090c" stroke-width="${(strokeW * 0.45).toFixed(1)}" />`;
-    });
-    svg.innerHTML = html;
+    scheduleRender();
   }
 
   function zoomAt(clientX, clientY, factor) {
-    setWorldAnimating(false);
-    const vp = $("map-viewport");
-    const rect = vp.getBoundingClientRect();
+    cancelCameraTween();
+    const rect = state.vpRect || $("map-viewport").getBoundingClientRect();
     const mx = clientX - rect.left;
     const my = clientY - rect.top;
     const wx = (mx - state.tx) / state.scale;
     const wy = (my - state.ty) / state.scale;
 
     const minS = state.fitScale * 0.72;
-    const maxS = Math.max(2.2, state.fitScale * 18);
+    const maxS = Math.max(2.0, state.fitScale * 16);
     const nextScale = Math.min(maxS, Math.max(minS, state.scale * factor));
     state.scale = nextScale;
     state.tx = mx - wx * nextScale;
     state.ty = my - wy * nextScale;
-    applyTransform();
+    scheduleRender();
   }
 
   function focusOnCoords(xPct, yPct, zoomFactor = 4.4, animate = true, exactZoom = false) {
-    const vp = $("map-viewport");
-    const vw = vp.clientWidth || 960;
-    const vh = vp.clientHeight || 640;
-    const maxS = Math.max(2.2, state.fitScale * 18);
+    syncCanvasSize();
+    const maxS = Math.max(2.0, state.fitScale * 16);
     const desired = state.fitScale * zoomFactor;
-    const targetScale = exactZoom ? desired : Math.max(state.scale, desired);
+    const targetScale = Math.min(maxS, Math.max(state.fitScale, exactZoom ? desired : Math.max(state.scale, desired)));
     const wx = (xPct / 100) * state.imgW;
     const wy = (yPct / 100) * state.imgH;
-    state.scale = Math.min(maxS, Math.max(state.fitScale, targetScale));
-    state.tx = vw / 2 - wx * state.scale;
-    state.ty = vh / 2 - wy * state.scale;
+    const targetTx = state.vpW / 2 - wx * targetScale;
+    const targetTy = state.vpH / 2 - wy * targetScale;
     $("hud-grid").textContent = coordsToGridSector(xPct, yPct);
     $("hud-coords").textContent = `${xPct.toFixed(1)}, ${yPct.toFixed(1)}`;
-    setWorldAnimating(animate);
-    applyTransform();
+    animateCameraTo(targetScale, targetTx, targetTy, animate);
   }
 
   function clientToMapPercent(clientX, clientY) {
-    const vp = $("map-viewport");
-    const rect = vp.getBoundingClientRect();
+    const rect = state.vpRect || $("map-viewport").getBoundingClientRect();
     const mx = clientX - rect.left;
     const my = clientY - rect.top;
     const wx = (mx - state.tx) / state.scale;
@@ -1006,7 +1147,7 @@
   }
 
   // =========================================================================
-  // FILTERING & RENDERING MARKERS
+  // FILTERING & RENDERING MARKERS (CACHED SCREEN-SPACE NODES)
   // =========================================================================
   function getMapMarkers() {
     return state.markers.filter((m) => m.mapId === state.activeMapId);
@@ -1017,9 +1158,8 @@
     return getMapMarkers().filter((m) => {
       if (!state.enabledCategories.has(m.category)) return false;
       if (state.hideFound && state.foundMarkers.has(m.id)) return false;
-      if (state.onlyCommunity && !m.isCommunity) return false;
       if (q) {
-        const hay = norm(`${m.title} ${m.region} ${m.description} ${m.howTo || ""} ${m.author || ""} ${CATEGORIES[m.category]?.label || ""}`);
+        const hay = norm(`${m.title} ${m.region} ${m.description} ${m.howTo || ""} ${CATEGORIES[m.category]?.label || ""}`);
         if (!hay.includes(q)) return false;
       }
       return true;
@@ -1077,16 +1217,29 @@
           <button type="button"
                   class="map-pin${isSel ? " selected" : ""}${isFound ? " is-found" : ""}"
                   data-marker-id="${esc(m.id)}"
-                  style="left:${m.x}%; top:${m.y}%;"
                   title="${esc(m.title)}">
             <span class="pin-disc${isBadge ? " is-badge" : ""}">
-              <img src="${blipUrl(m.blip)}" alt="" />
+              <img src="${blipUrl(m.blip)}" alt="" decoding="async" />
               ${isFound ? `<span class="pin-found-dot"><img src="${checkIcon}" alt="" /></span>` : ""}
             </span>
             <span class="pin-label">${esc(m.title)}</span>
           </button>`;
       })
       .join("");
+
+    // Cache DOM refs + world pixel coords so pan/zoom never queries DOM or parses floats
+    const els = layer.children;
+    state.pinNodes = new Array(visible.length);
+    for (let i = 0; i < visible.length; i++) {
+      const m = visible[i];
+      state.pinNodes[i] = {
+        el: els[i],
+        wx: (m.x / 100) * state.imgW,
+        wy: (m.y / 100) * state.imgH,
+        culled: false,
+      };
+    }
+    scheduleRender();
 
     const listEl = $("marker-list");
     if (!visible.length) {
@@ -1100,7 +1253,7 @@
         const isSel = state.selectedMarkerId === m.id;
         return `
           <button type="button" class="marker-item${isSel ? " selected" : ""}${isFound ? " is-found" : ""}" data-marker-id="${esc(m.id)}">
-            <img src="${blipUrl(m.blip)}" alt="" class="marker-item-icon" />
+            <img src="${blipUrl(m.blip)}" alt="" class="marker-item-icon" loading="lazy" decoding="async" />
             <span class="marker-item-text">
               <span class="marker-item-title">${esc(m.title)}</span>
               <span class="marker-item-sub">${esc(m.region || CATEGORIES[m.category]?.label || m.category)}</span>
@@ -1151,20 +1304,14 @@
       if (linkedEvent.chapter) badges.push(`<span class="badge verified">${esc(linkedEvent.chapter)}</span>`);
       if (linkedEvent.character) badges.push(`<span class="badge">${esc(linkedEvent.character)}</span>`);
       if (linkedEvent.missable) badges.push(`<span class="ev-pill missable">Perdible</span>`);
-    } else if (m.isCommunity) {
-      badges.push(`<span class="badge live-community">${state.liveCommunity.enabled ? "Comunidad en Vivo" : "Pin Comunitario"}</span>`);
     } else {
       if (m.verified) badges.push(`<span class="badge verified">Guía Oficial</span>`);
-      else badges.push(`<span class="badge">Pin Comunitario</span>`);
+      else badges.push(`<span class="badge">Pin Personal</span>`);
     }
     if (isFound) badges.push(`<span class="badge found">Encontrado</span>`);
     $("insp-badges").innerHTML = badges.join("");
-
-    // Show Delete only when permitted (any pin in local mode; own community pins in live mode)
-    const canDelete = !state.liveCommunity.enabled || (m.isCommunity && m.isMine);
-    const canEdit = !state.liveCommunity.enabled || !m.isCommunity || m.isMine;
-    $("btn-insp-delete").classList.toggle("hidden", !canDelete);
-    $("btn-insp-edit").classList.toggle("hidden", !canEdit);
+    $("btn-insp-delete").classList.remove("hidden");
+    $("btn-insp-edit").classList.remove("hidden");
 
     const howtoBox = $("insp-howto-box");
     const evGuideEl = $("insp-event-guide");
@@ -1220,6 +1367,10 @@
     }
     updateMobileBackdrop();
     renderMarkers();
+    requestAnimationFrame(() => {
+      syncCanvasSize();
+      scheduleRender();
+    });
   }
 
   function renderInspectorComments(m) {
@@ -1249,6 +1400,10 @@
     $("inspector").classList.add("hidden");
     updateMobileBackdrop();
     renderMarkers();
+    requestAnimationFrame(() => {
+      syncCanvasSize();
+      scheduleRender();
+    });
   }
 
   // =========================================================================
@@ -1262,6 +1417,7 @@
     $("placement-banner").classList.toggle("hidden", !active);
     $("btn-add-pin").classList.toggle("is-active", active);
     if (!active) {
+      state.reticleCoords = null;
       $("placement-reticle").classList.add("hidden");
     }
   }
@@ -1293,6 +1449,7 @@
 
   function closePinModal() {
     $("pin-modal-backdrop").classList.add("hidden");
+    state.reticleCoords = null;
     $("placement-reticle").classList.add("hidden");
   }
 
@@ -1316,44 +1473,6 @@
     };
 
     try {
-      if (state.liveCommunity.enabled) {
-        if (editId) {
-          if (editId.startsWith("com-")) {
-            const res = await communityApi({ action: "update_pin", id: editId, ...payload });
-            const idx = state.liveCommunity.pins.findIndex((p) => p.id === editId);
-            if (idx >= 0) state.liveCommunity.pins[idx] = res.marker;
-            rebuildMergedMarkers();
-            toast("Marcador comunitario actualizado en vivo.");
-            closePinModal();
-            renderCategoryFilters();
-            openInspector(editId, false);
-            return;
-          }
-          // Personal local override on official pin
-          state.userPins.overrides[editId] = { ...(state.userPins.overrides[editId] || {}), ...payload };
-          saveLocalUserPins();
-          rebuildMergedMarkers();
-          toast("Ajuste personal guardado en tu navegador.");
-          closePinModal();
-          renderCategoryFilters();
-          openInspector(editId, false);
-          return;
-        }
-        const res = await communityApi({ action: "create_pin", ...payload });
-        state.liveCommunity.pins.unshift(res.marker);
-        if (res.activity) state.liveCommunity.activity.unshift(res.activity);
-        state.liveCommunity.stats.pins = state.liveCommunity.pins.length;
-        updateLiveStatusUI();
-        rebuildMergedMarkers();
-        state.enabledCategories.add(res.marker.category);
-        toast("Pin compartido en vivo con toda la comunidad.");
-        closePinModal();
-        setPlacementMode(false);
-        renderCategoryFilters();
-        openInspector(res.marker.id, false);
-        return;
-      }
-
       if (state.hasLocalApi) {
         if (editId) {
           const res = await api(`/api/markers/${encodeURIComponent(editId)}`, {
@@ -1961,93 +2080,6 @@
   }
 
   // =========================================================================
-  // LIVE COMMUNITY ACTIVITY MODAL
-  // =========================================================================
-  function openCommunityModal() {
-    $("community-modal-backdrop").classList.remove("hidden");
-    renderCommunityModal();
-    if (state.liveCommunity.enabled) {
-      syncLiveCommunity(true);
-    }
-  }
-
-  function closeCommunityModal() {
-    $("community-modal-backdrop").classList.add("hidden");
-  }
-
-  function formatRelTime(isoStr) {
-    if (!isoStr) return "";
-    const diffSec = Math.max(0, Math.floor((Date.now() - new Date(isoStr).getTime()) / 1000));
-    if (diffSec < 60) return "ahora";
-    if (diffSec < 3600) return `hace ${Math.floor(diffSec / 60)}m`;
-    if (diffSec < 86400) return `hace ${Math.floor(diffSec / 3600)}h`;
-    return isoStr.slice(0, 10);
-  }
-
-  function renderCommunityModal() {
-    const lc = state.liveCommunity;
-    const statusEl = $("community-modal-status");
-    const statsRow = $("community-stats-row");
-    const feedCount = $("community-feed-count");
-    const listEl = $("community-feed-list");
-
-    const localAdded = state.userPins.added || [];
-    const pinCount = lc.enabled ? (lc.stats?.pins ?? lc.pins.length) : localAdded.length;
-    const noteCount = lc.enabled
-      ? (lc.stats?.comments || 0)
-      : Object.values(state.userPins.comments || {}).reduce((acc, arr) => acc + arr.length, 0);
-    const voteCount = lc.enabled
-      ? (lc.stats?.totalVotes || 0)
-      : Object.values(state.userPins.votes || {}).reduce((acc, n) => acc + Number(n || 0), 0);
-
-    statusEl.textContent = lc.enabled
-      ? `En vivo · Sincronizado ${lc.syncedAt ? formatRelTime(lc.syncedAt) : "ahora"}`
-      : "Modo local (se guarda en este navegador)";
-
-    statsRow.innerHTML = `
-      <div class="rm-stat"><span class="rm-stat-k">PINES COMUNIDAD</span><span class="rm-stat-v">${pinCount}</span></div>
-      <div class="rm-stat"><span class="rm-stat-k">NOTAS COMPARTIDAS</span><span class="rm-stat-v">${noteCount}</span></div>
-      <div class="rm-stat"><span class="rm-stat-k">VOTOS EN VIVO</span><span class="rm-stat-v">${voteCount}</span></div>
-    `;
-
-    const items = lc.enabled ? (lc.activity || []) : localAdded.map((p) => ({
-      type: "pin",
-      markerId: p.id,
-      title: p.title,
-      region: p.region,
-      author: p.author || "Jugador",
-      blip: p.blip || "blip_pin",
-      createdAt: p.createdAt,
-    }));
-
-    feedCount.textContent = String(items.length);
-    if (!items.length) {
-      listEl.innerHTML = `<div class="empty-state">Aún no hay actividad reciente. ¡Sé el primero en compartir un pin o una nota en Leonida!</div>`;
-      return;
-    }
-
-    listEl.innerHTML = items
-      .map((a) => {
-        const isPin = a.type === "pin";
-        const icon = isPin ? blipUrl(a.blip || "blip_pin") : blipUrl("blip_contact");
-        const headline = isPin
-          ? `${esc(a.author || "Explorador")} añadió "${esc(a.title)}"`
-          : `${esc(a.author || "Explorador")} comentó en "${esc(a.title)}"`;
-        const sub = isPin ? (a.region || "Leonida") : a.text || "";
-        return `
-          <button type="button" class="community-feed-item" data-feed-marker="${esc(a.markerId)}">
-            <img src="${icon}" alt="" class="community-feed-icon" />
-            <span class="community-feed-main">
-              <span class="community-feed-title">${headline}</span>
-              <span class="community-feed-sub">${esc(sub)}</span>
-            </span>
-            <span class="community-feed-time">${esc(formatRelTime(a.createdAt))}</span>
-          </button>`;
-      })
-      .join("");
-  }
-
-  // =========================================================================
   // GLOBAL INSTANT SEARCH COMMAND PALETTE (CTRL+K)
   // =========================================================================
   const QUICK_SEARCH_CHIPS = [
@@ -2268,6 +2300,8 @@
       state.eventType = "all";
       state.eventSearch = "";
       $("events-search").value = "";
+      state.renderedViews.add("events");
+      renderGuide100Box();
       renderEventsView();
       switchView("events");
     } else if (item.kind === "mechanic" || item.kind === "trophy") {
@@ -2276,22 +2310,26 @@
       state.trophyCat = "all";
       state.trophySearch = "";
       $("trophy-search").value = "";
+      state.renderedViews.add("guide");
       renderGuideView();
       switchView("guide");
     } else if (item.kind === "collectible") {
       state.collCat = "all";
       state.collSearch = item.title;
       $("coll-search").value = item.title;
+      state.renderedViews.add("collectibles");
       renderCollectiblesView();
       switchView("collectibles");
     } else if (item.kind === "arsenal") {
       state.arsenalCat = "all";
       state.arsenalSearch = item.title;
       $("arsenal-search").value = item.title;
+      state.renderedViews.add("arsenal");
       renderArsenalView();
       switchView("arsenal");
     } else if (item.kind === "wordmark") {
       state.blipGroup = "wordmarks";
+      state.renderedViews.add("blips");
       renderBlipsView();
       switchView("blips");
     }
@@ -2361,9 +2399,9 @@
         }
         renderCategoryFilters();
         renderMarkers();
-        renderEventsView();
-        renderGuideView();
-        renderCollectiblesView();
+        if (state.renderedViews.has("events")) renderEventsView();
+        if (state.renderedViews.has("guide")) renderGuideView();
+        if (state.renderedViews.has("collectibles")) renderCollectiblesView();
         toast(`Importados ${state.markers.length} marcadores.`);
       } catch (err) {
         toast(`Error al importar JSON: ${err.message}`, true);
@@ -2384,24 +2422,6 @@
       $("sidebar").classList.add("collapsed");
       if (!$("inspector").classList.contains("hidden")) closeInspector();
       else updateMobileBackdrop();
-    });
-
-    $("btn-live-feed")?.addEventListener("click", openCommunityModal);
-    $("btn-close-community-modal")?.addEventListener("click", closeCommunityModal);
-    $("community-modal-backdrop")?.addEventListener("click", (e) => {
-      if (e.target === $("community-modal-backdrop")) closeCommunityModal();
-    });
-    $("btn-community-refresh")?.addEventListener("click", () => syncLiveCommunity(false));
-    $("btn-community-add-pin")?.addEventListener("click", () => {
-      closeCommunityModal();
-      if (state.activeView !== "map") switchView("map");
-      setPlacementMode(true);
-    });
-    $("community-feed-list")?.addEventListener("click", (e) => {
-      const btn = e.target.closest("[data-feed-marker]");
-      if (!btn) return;
-      closeCommunityModal();
-      jumpToMarkerOnMap(btn.dataset.feedMarker);
     });
 
     $("btn-add-pin").addEventListener("click", () => {
@@ -2457,10 +2477,6 @@
       state.showLabels = e.target.checked;
       renderMarkers();
     });
-    $("chk-only-community")?.addEventListener("change", (e) => {
-      state.onlyCommunity = e.target.checked;
-      renderMarkers();
-    });
 
     $("category-filters").addEventListener("click", (e) => {
       const chip = e.target.closest(".cat-chip");
@@ -2505,15 +2521,16 @@
     const vp = $("map-viewport");
     vp.addEventListener("wheel", (e) => {
       e.preventDefault();
-      const factor = e.deltaY < 0 ? 1.2 : 1 / 1.2;
+      // Smooth normalized zoom step for both mouse wheel & precision trackpads
+      const clampedDelta = Math.max(-140, Math.min(140, e.deltaY));
+      const factor = Math.pow(1.0018, -clampedDelta);
       zoomAt(e.clientX, e.clientY, factor);
-      if (state.routePoints.length) renderRoute();
     }, { passive: false });
 
     vp.addEventListener("pointerdown", (e) => {
       if (e.button !== 0 && e.pointerType === "mouse") return;
       if (e.target.closest(".map-pin")) return;
-      setWorldAnimating(false);
+      cancelCameraTween();
       state.pointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
       vp.setPointerCapture(e.pointerId);
 
@@ -2558,17 +2575,36 @@
         return;
       }
 
-      const pos = clientToMapPercent(e.clientX, e.clientY);
-      $("hud-coords").textContent = `${pos.x.toFixed(1)}, ${pos.y.toFixed(1)}`;
-      $("hud-grid").textContent = coordsToGridSector(pos.x, pos.y);
+      if (state.dragging) {
+        const dx = e.clientX - state.dragStartX;
+        const dy = e.clientY - state.dragStartY;
+        state.dragMoved = Math.max(state.dragMoved, Math.hypot(dx, dy));
+        state.tx = state.dragOrigTx + dx;
+        state.ty = state.dragOrigTy + dy;
+        scheduleRender();
+        return;
+      }
 
-      if (!state.dragging) return;
-      const dx = e.clientX - state.dragStartX;
-      const dy = e.clientY - state.dragStartY;
-      state.dragMoved = Math.max(state.dragMoved, Math.hypot(dx, dy));
-      state.tx = state.dragOrigTx + dx;
-      state.ty = state.dragOrigTy + dy;
-      applyTransform();
+      // Throttle hover coordinate HUD updates to 1 rAF (zero main-thread spam)
+      state.hoverClientX = e.clientX;
+      state.hoverClientY = e.clientY;
+      if (!state.hoverRafId) {
+        state.hoverRafId = requestAnimationFrame(() => {
+          state.hoverRafId = 0;
+          if (state.hoverClientX == null || state.dragging) return;
+          const pos = clientToMapPercent(state.hoverClientX, state.hoverClientY);
+          const cText = `${pos.x.toFixed(1)}, ${pos.y.toFixed(1)}`;
+          const gText = coordsToGridSector(pos.x, pos.y);
+          if (cText !== state.lastCoordsText) {
+            state.lastCoordsText = cText;
+            $("hud-coords").textContent = cText;
+          }
+          if (gText !== state.lastGridText) {
+            state.lastGridText = gText;
+            $("hud-grid").textContent = gText;
+          }
+        });
+      }
     });
 
     const endPointer = (e) => {
@@ -2588,10 +2624,9 @@
       if (state.dragMoved < 8) {
         const pos = clientToMapPercent(e.clientX, e.clientY);
         if (state.placing) {
-          const reticle = $("placement-reticle");
-          reticle.style.left = `${pos.x}%`;
-          reticle.style.top = `${pos.y}%`;
-          reticle.classList.remove("hidden");
+          state.reticleCoords = { x: pos.x, y: pos.y };
+          $("placement-reticle").classList.remove("hidden");
+          scheduleRender();
           openPinModal({ x: pos.x, y: pos.y });
         } else if (state.measuring && pos.inside) {
           state.routePoints.push({ x: pos.x, y: pos.y });
@@ -2622,12 +2657,10 @@
       const r = mm.getBoundingClientRect();
       const xPct = Math.max(0, Math.min(100, ((e.clientX - r.left) / r.width) * 100));
       const yPct = Math.max(0, Math.min(100, ((e.clientY - r.top) / r.height) * 100));
-      const vpw = vp.clientWidth || 960;
-      const vph = vp.clientHeight || 640;
-      setWorldAnimating(false);
-      state.tx = vpw / 2 - (xPct / 100) * state.imgW * state.scale;
-      state.ty = vph / 2 - (yPct / 100) * state.imgH * state.scale;
-      applyTransform();
+      cancelCameraTween();
+      state.tx = state.vpW / 2 - (xPct / 100) * state.imgW * state.scale;
+      state.ty = state.vpH / 2 - (yPct / 100) * state.imgH * state.scale;
+      scheduleRender();
     };
     mm.addEventListener("pointerdown", (e) => {
       e.stopPropagation();
@@ -2645,11 +2678,11 @@
     });
 
     $("btn-zoom-in").addEventListener("click", () => {
-      const r = vp.getBoundingClientRect();
+      const r = state.vpRect || vp.getBoundingClientRect();
       zoomAt(r.left + r.width / 2, r.top + r.height / 2, 1.45);
     });
     $("btn-zoom-out").addEventListener("click", () => {
-      const r = vp.getBoundingClientRect();
+      const r = state.vpRect || vp.getBoundingClientRect();
       zoomAt(r.left + r.width / 2, r.top + r.height / 2, 1 / 1.45);
     });
     $("btn-zoom-fit").addEventListener("click", () => fitMapToViewport(true));
@@ -2657,6 +2690,7 @@
       state.showPins = !state.showPins;
       $("btn-toggle-pins").classList.toggle("is-on", state.showPins);
       $("map-pins-layer").classList.toggle("pins-hidden", !state.showPins);
+      if (state.showPins) scheduleRender();
     });
     $("btn-toggle-sidebar").addEventListener("click", () => {
       const opening = $("sidebar").classList.contains("collapsed");
@@ -2665,6 +2699,10 @@
         closeInspector();
       }
       updateMobileBackdrop();
+      requestAnimationFrame(() => {
+        syncCanvasSize();
+        scheduleRender();
+      });
     });
 
     // Inspector actions
@@ -2713,17 +2751,6 @@
       const mid = state.selectedMarkerId;
       if (!mid) return;
       try {
-        if (state.liveCommunity.enabled) {
-          const res = await communityApi({ action: "vote", markerId: mid });
-          state.liveCommunity.votes[mid] = Number(res.votesDelta || 0);
-          if (!res.alreadyVoted) {
-            state.liveCommunity.stats.totalVotes = Number(state.liveCommunity.stats.totalVotes || 0) + 1;
-          }
-          rebuildMergedMarkers();
-          openInspector(mid, false);
-          toast(res.alreadyVoted ? "Ya habías votado por esta ubicación." : "Voto registrado en vivo.");
-          return;
-        }
         if (state.hasLocalApi) {
           const res = await api(`/api/markers/${encodeURIComponent(mid)}/vote`, { method: "POST" });
           const idx = state.markers.findIndex((x) => x.id === mid);
@@ -2750,23 +2777,6 @@
       if (!m) return;
       if (!window.confirm(`¿Eliminar el marcador "${m.title}"?`)) return;
       try {
-        if (state.liveCommunity.enabled) {
-          if (m.isCommunity && m.isMine) {
-            await communityApi({ action: "delete_pin", id: m.id });
-            state.liveCommunity.pins = state.liveCommunity.pins.filter((p) => p.id !== m.id);
-            state.liveCommunity.stats.pins = state.liveCommunity.pins.length;
-            updateLiveStatusUI();
-            rebuildMergedMarkers();
-            state.foundMarkers.delete(m.id);
-            await persistProgress();
-            closeInspector();
-            renderCategoryFilters();
-            toast("Marcador comunitario eliminado en vivo.");
-            return;
-          }
-          toast("Los marcadores oficiales de la guía no se pueden borrar del mapa compartido.", true);
-          return;
-        }
         if (state.hasLocalApi) {
           await api(`/api/markers/${encodeURIComponent(m.id)}`, { method: "DELETE" });
           state.markers = state.markers.filter((x) => x.id !== m.id);
@@ -2790,30 +2800,11 @@
       e.preventDefault();
       const mid = state.selectedMarkerId;
       if (!mid) return;
-      const mk = state.markers.find((x) => x.id === mid);
       const author = $("comment-author").value.trim() || localStorage.getItem("gta6_author") || "Jugador";
       const text = $("comment-text").value.trim();
       if (!text) return;
       localStorage.setItem("gta6_author", author);
       try {
-        if (state.liveCommunity.enabled) {
-          const res = await communityApi({
-            action: "comment",
-            markerId: mid,
-            markerTitle: mk?.title || mid,
-            author,
-            text,
-          });
-          state.liveCommunity.comments[mid] = state.liveCommunity.comments[mid] || [];
-          state.liveCommunity.comments[mid].push(res.comment);
-          if (res.activity) state.liveCommunity.activity.unshift(res.activity);
-          state.liveCommunity.stats.comments = Number(state.liveCommunity.stats.comments || 0) + 1;
-          rebuildMergedMarkers();
-          $("comment-text").value = "";
-          openInspector(mid, false);
-          toast("Nota publicada en vivo para toda la comunidad.");
-          return;
-        }
         if (state.hasLocalApi) {
           const res = await api(`/api/markers/${encodeURIComponent(mid)}/comments`, {
             method: "POST",
@@ -3084,7 +3075,6 @@
 
       if (e.key === "Escape") {
         if (!$("global-search-backdrop").classList.contains("hidden")) closeGlobalSearch();
-        else if (!$("community-modal-backdrop").classList.contains("hidden")) closeCommunityModal();
         else if (!$("lightbox").classList.contains("hidden")) closeLightbox();
         else if (!$("pin-modal-backdrop").classList.contains("hidden")) closePinModal();
         else if (state.placing) setPlacementMode(false);
@@ -3117,9 +3107,11 @@
       }
     });
     window.addEventListener("resize", () => {
-      updateLiveStatusUI();
       updateMobileBackdrop();
-      if (state.activeView === "map") applyTransform();
+      if (state.activeView === "map") {
+        syncCanvasSize();
+        scheduleRender();
+      }
     });
   }
 

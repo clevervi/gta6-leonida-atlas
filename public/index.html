@@ -87,10 +87,6 @@
     <div class="subbar">
       <div class="region-strip" id="region-bar" role="toolbar" aria-label="Condados de Leonida"></div>
       <div class="subbar-right">
-        <button type="button" class="live-pill" id="btn-live-feed" title="Actividad comunitaria compartida en vivo">
-          <span class="live-dot" id="live-dot"></span>
-          <span id="live-pill-label">CONECTANDO</span>
-        </button>
         <div class="theme-switch" role="group" aria-label="Modo del mapa">
           <button type="button" class="theme-btn active" id="btn-theme-night" data-theme="night" title="Mapa Nocturno (Tecla N)">NOCHE</button>
           <button type="button" class="theme-btn" id="btn-theme-day" data-theme="day" title="Mapa de Día (Tecla N)">DÍA</button>
@@ -128,11 +124,7 @@
               </label>
               <label class="switch-label">
                 <input type="checkbox" id="chk-show-labels" />
-                <span>Etiquetas</span>
-              </label>
-              <label class="switch-label" title="Mostrar solo marcadores compartidos por la comunidad">
-                <input type="checkbox" id="chk-only-community" />
-                <span>Comunidad</span>
+                <span>Etiquetas fijas</span>
               </label>
             </div>
           </div>
@@ -187,14 +179,11 @@
           <button class="btn btn-sm btn-flat" id="btn-route-close">Cerrar</button>
         </div>
 
-        <!-- Interactive Pan/Zoom Surface -->
+        <!-- Interactive Pan/Zoom Surface (Fast Tile Canvas + Screen-Space Culled Pins) -->
         <div class="map-viewport" id="map-viewport" tabindex="0" aria-label="Mapa interactivo de Leonida">
-          <div class="map-world" id="map-world">
-            <img id="map-image" src="" alt="Mapa del Estado de Leonida — Grand Theft Auto VI" draggable="false" />
-            <svg class="route-svg" id="route-svg" viewBox="0 0 5395 7521" preserveAspectRatio="none"></svg>
-            <div class="map-pins-layer" id="map-pins-layer"></div>
-            <div class="placement-reticle hidden" id="placement-reticle"></div>
-          </div>
+          <canvas class="map-canvas" id="map-canvas"></canvas>
+          <div class="map-pins-layer" id="map-pins-layer"></div>
+          <div class="placement-reticle hidden" id="placement-reticle"></div>
         </div>
 
         <!-- Bottom-Left Tactical Status Bar -->
@@ -627,39 +616,6 @@
       </div>
       <div class="lightbox-stage">
         <img id="lightbox-img" src="" alt="" />
-      </div>
-    </div>
-  </div>
-
-  <!-- MODAL: LIVE COMMUNITY ACTIVITY FEED -->
-  <div class="modal-backdrop hidden" id="community-modal-backdrop" role="dialog" aria-modal="true" aria-label="Comunidad en vivo de Leonida">
-    <div class="modal-card community-modal-card">
-      <div class="modal-head">
-        <div class="modal-head-left">
-          <img src="/extracted/blips/blip_contact.png" alt="" class="modal-blip-preview" />
-          <div>
-            <h2>COMUNIDAD DE LEONIDA EN VIVO</h2>
-            <span class="muted mono" id="community-modal-status">Sincronizando hallazgos...</span>
-          </div>
-        </div>
-        <div class="community-head-actions">
-          <button type="button" class="btn btn-sm btn-flat" id="btn-community-refresh" title="Actualizar ahora">ACTUALIZAR</button>
-          <button type="button" class="icon-btn" id="btn-close-community-modal" title="Cerrar">
-            <img src="/extracted/blips/ui_close.png" alt="" class="ui-icon" />
-          </button>
-        </div>
-      </div>
-      <div class="modal-body community-modal-body">
-        <div class="community-stats-row" id="community-stats-row"></div>
-        <div class="community-cta-bar">
-          <span>Los marcadores, votos y notas que publiques aquí son visibles para todos los jugadores de Leonida.</span>
-          <button type="button" class="btn btn-sm btn-primary" id="btn-community-add-pin">+ COMPARTIR PIN</button>
-        </div>
-        <div class="block-head">
-          <h3>ACTIVIDAD RECIENTE</h3>
-          <span class="count-num mono" id="community-feed-count">0</span>
-        </div>
-        <div class="community-feed-list" id="community-feed-list"></div>
       </div>
     </div>
   </div>
