@@ -3,18 +3,20 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=5.0" />
-  <title>GTA VI — Atlas y Guia Interactiva de Leonida</title>
-  <meta name="description" content="Mapa interactivo completo de Leonida en GTA VI con modo noche y dia, guia paso a paso de Extranos y Locos (Kirk y el Skunk Ape, Bret Vogel, Kenton, Yago), caza legendaria, coleccionables, armas, vehiculos y medidor GPS." />
+  <title>GTA VI — Atlas y Guía Interactiva de Leonida</title>
+  <meta name="description" content="Mapa interactivo completo de Leonida en GTA VI (noche y día), guía paso a paso de Extraños y Locos (Kirk y el Skunk Ape, Bret Vogel, Kenton, Yago, Moses, Yasmani), manual de mecánicas, trofeos, coleccionables, armas y vehículos." />
   <meta name="theme-color" content="#08090c" />
   <meta property="og:type" content="website" />
-  <meta property="og:title" content="GTA VI — Atlas y Guia Interactiva de Leonida" />
-  <meta property="og:description" content="Mapa interactivo de los 5 condados y cayos de Leonida, 32 guias de eventos y Extranos y Locos, 155 coleccionables, 130 armas y vehiculos y medidor GPS." />
+  <meta property="og:title" content="GTA VI — Atlas y Guía Interactiva de Leonida" />
+  <meta property="og:description" content="126 ubicaciones con indicaciones, 36 guías de Extraños y Locos y Peristas, manual de mecánicas y trofeos, 152 coleccionables, 130 armas y vehículos y buscador global." />
   <meta property="og:image" content="/og-preview.jpg" />
   <meta name="twitter:card" content="summary_large_image" />
-  <meta name="twitter:title" content="GTA VI — Atlas y Guia Interactiva de Leonida" />
-  <meta name="twitter:description" content="Mapa completo de Leonida, eventos, Extranos y Locos, coleccionables, arsenal y garaje." />
+  <meta name="twitter:title" content="GTA VI — Atlas y Guía Interactiva de Leonida" />
+  <meta name="twitter:description" content="Mapa completo de Leonida, guía paso a paso de eventos, mecánicas, trofeos, coleccionables, arsenal y garaje." />
   <meta name="twitter:image" content="/og-preview.jpg" />
+  <link rel="manifest" href="/manifest.webmanifest" />
   <link rel="icon" type="image/png" href="/extracted/blips/blip_map.png" />
+  <link rel="apple-touch-icon" href="/icon-192.png" />
   <link rel="stylesheet" href="/styles.css" />
 </head>
 <body>
@@ -24,32 +26,41 @@
       <img src="/extracted/branding/gta6_logo_color.png" alt="Grand Theft Auto VI" class="brand-logo" />
       <div class="brand-meta">
         <span class="brand-title">LEONIDA ATLAS</span>
-        <span class="brand-sub mono">GUIA INTERACTIVA</span>
+        <span class="brand-sub mono">GUÍA INTERACTIVA</span>
       </div>
     </div>
 
-    <nav class="main-nav" role="tablist" aria-label="Secciones de la guia">
+    <nav class="main-nav" role="tablist" aria-label="Secciones de la guía">
       <button class="nav-tab active" data-view="map" role="tab" aria-selected="true">
         <span>MAPA</span>
       </button>
       <button class="nav-tab" data-view="events" role="tab" aria-selected="false">
-        <span>EVENTOS Y MISIONES</span>
+        <span>EVENTOS</span>
         <span class="nav-count mono" id="nav-events-count">0/0</span>
+      </button>
+      <button class="nav-tab" data-view="guide" role="tab" aria-selected="false">
+        <span>GUÍA</span>
+        <span class="nav-count mono" id="nav-trophy-count">0/0</span>
       </button>
       <button class="nav-tab" data-view="collectibles" role="tab" aria-selected="false">
         <span>COLECCIONABLES</span>
         <span class="nav-count mono" id="nav-coll-count">0/0</span>
       </button>
       <button class="nav-tab" data-view="arsenal" role="tab" aria-selected="false">
-        <span>ARSENAL Y GARAJE</span>
+        <span>ARSENAL</span>
         <span class="nav-count mono" id="nav-arsenal-count">0</span>
       </button>
       <button class="nav-tab" data-view="blips" role="tab" aria-selected="false">
-        <span>DISTRITOS E ICONOS</span>
+        <span>DISTRITOS</span>
       </button>
     </nav>
 
     <div class="topbar-actions">
+      <button class="btn btn-flat btn-search-global" id="btn-global-search" title="Buscar en todo el atlas (Ctrl+K)">
+        <img src="/extracted/blips/ui_search.png" alt="" class="ui-icon" />
+        <span>BUSCAR</span>
+        <kbd class="kbd-hint mono">Ctrl+K</kbd>
+      </button>
       <button class="btn btn-flat" id="btn-measure-route" title="Medir ruta GPS en millas y km (Tecla M)">
         <img src="/extracted/blips/ui_route.png" alt="" class="ui-icon" />
         <span>RUTA</span>
@@ -74,7 +85,7 @@
       <div class="region-strip" id="region-bar" role="toolbar" aria-label="Condados de Leonida"></div>
       <div class="theme-switch" role="group" aria-label="Modo del mapa">
         <button type="button" class="theme-btn active" id="btn-theme-night" data-theme="night" title="Mapa Nocturno (Tecla N)">NOCHE</button>
-        <button type="button" class="theme-btn" id="btn-theme-day" data-theme="day" title="Mapa de Dia (Tecla N)">DIA</button>
+        <button type="button" class="theme-btn" id="btn-theme-day" data-theme="day" title="Mapa de Día (Tecla N)">DÍA</button>
       </div>
     </div>
 
@@ -84,15 +95,15 @@
         <div class="sidebar-top">
           <div class="search-box">
             <img src="/extracted/blips/ui_search.png" alt="" class="ui-icon search-icon" />
-            <input type="text" id="map-search" placeholder="Buscar ciudad, evento, Kirk, sector..." autocomplete="off" />
-            <button class="icon-clear hidden" id="btn-clear-search" title="Limpiar busqueda">
+            <input type="text" id="map-search" placeholder="Buscar ciudad, Kirk, Bret, sector..." autocomplete="off" />
+            <button class="icon-clear hidden" id="btn-clear-search" title="Limpiar búsqueda">
               <img src="/extracted/blips/ui_close.png" alt="" class="ui-icon" />
             </button>
           </div>
 
           <div class="progress-strip">
             <div class="progress-row">
-              <span class="progress-label">EXPLORACION</span>
+              <span class="progress-label">EXPLORACIÓN</span>
               <span class="progress-value mono" id="map-progress-text">0 / 0</span>
             </div>
             <div class="progress-track">
@@ -199,13 +210,13 @@
       </section>
 
       <!-- RIGHT EDITORIAL DETAIL INSPECTOR -->
-      <aside class="inspector hidden" id="inspector" aria-label="Detalles de la ubicacion">
+      <aside class="inspector hidden" id="inspector" aria-label="Detalles de la ubicación">
         <div class="inspector-top">
           <div class="inspector-head-left">
             <img id="insp-blip" src="" alt="" class="insp-blip-img" />
             <div class="insp-titles">
-              <span class="insp-cat" id="insp-cat">CATEGORIA</span>
-              <h2 id="insp-title">Ubicacion</h2>
+              <span class="insp-cat" id="insp-cat">CATEGORÍA</span>
+              <h2 id="insp-title">Ubicación</h2>
             </div>
           </div>
           <button class="icon-btn" id="btn-close-inspector" title="Cerrar (ESC)">
@@ -221,13 +232,19 @@
 
           <!-- Full-Bleed Game Photo -->
           <div class="insp-media hidden" id="insp-media">
-            <img id="insp-image" src="" alt="Vista de la ubicacion" />
+            <img id="insp-image" src="" alt="Vista de la ubicación" />
             <span class="insp-media-hint mono">AMPLIAR IMAGEN</span>
           </div>
 
           <div class="insp-content">
             <div class="insp-tags" id="insp-badges"></div>
             <p class="insp-desc" id="insp-desc"></p>
+
+            <!-- Practical "Qué hacer aquí / Indicaciones" Box (shown on non-event pins) -->
+            <div class="insp-howto-box hidden" id="insp-howto-box">
+              <span class="insp-ev-k">CÓMO APROVECHAR ESTE LUGAR</span>
+              <span id="insp-howto-text"></span>
+            </div>
 
             <!-- Rich Event / Stranger & Freaks Mini-Walkthrough (shown on event pins) -->
             <div class="insp-event-guide hidden" id="insp-event-guide"></div>
@@ -242,7 +259,7 @@
                 <span class="meta-val mono" id="insp-coords">—</span>
               </div>
               <div class="meta-row">
-                <span class="meta-label">GUIA / AUTOR</span>
+                <span class="meta-label">GUÍA / AUTOR</span>
                 <span class="meta-val" id="insp-author">—</span>
               </div>
             </div>
@@ -280,7 +297,7 @@
               <div class="comments-list" id="insp-comments-list"></div>
               <form class="comment-form" id="comment-form">
                 <input type="text" id="comment-author" placeholder="Tu alias (opcional)" maxlength="40" />
-                <textarea id="comment-text" rows="2" placeholder="Anade una pista, ruta o hallazgo..." required></textarea>
+                <textarea id="comment-text" rows="2" placeholder="Añade una pista, ruta o hallazgo..." required></textarea>
                 <button type="submit" class="btn btn-primary btn-sm">PUBLICAR NOTA</button>
               </form>
             </div>
@@ -290,15 +307,15 @@
     </div>
   </main>
 
-  <!-- VIEW 2: EVENTS, STRANGERS & FREAKS, LEGENDARY HUNTS & 100% ACTIVITIES -->
+  <!-- VIEW 2: EVENTS, STRANGERS & FREAKS, PERISTAS, LEGENDARY HUNTS & 100% ACTIVITIES -->
   <main class="view-section" id="view-events">
     <div class="page-container">
       <div class="page-header">
         <div class="page-header-left">
           <img src="/extracted/blips/logo_bigfoot.png" alt="Eventos de Leonida" class="header-emblem" />
           <div>
-            <h1>EVENTOS, EXTRANOS Y LOCOS Y ACTIVIDADES</h1>
-            <p>Guia paso a paso de todas las historias secundarias de Leonida (Kirk y el Skunk Ape, Bret Vogel, Kenton, Yago, Pilot Pete, Randy y mas), eventos aleatorios, caza legendaria y requisitos del 100%.</p>
+            <h1>EVENTOS, EXTRAÑOS Y LOCOS Y ACTIVIDADES</h1>
+            <p>Guía paso a paso de todas las historias secundarias de Leonida (Kirk y el Skunk Ape, Bret Vogel, Kenton, Yago, Pilot Pete, Randy, Moses, Yasmani y más), eventos aleatorios, caza legendaria y requisitos del 100%.</p>
           </div>
         </div>
         <div class="header-progress">
@@ -321,7 +338,7 @@
         <div class="toolbar-right">
           <div class="search-box compact">
             <img src="/extracted/blips/ui_search.png" alt="" class="ui-icon search-icon" />
-            <input type="text" id="events-search" placeholder="Buscar Kirk, Skunk Ape, Bret, Lucia..." />
+            <input type="text" id="events-search" placeholder="Buscar Kirk, Skunk Ape, Bret, Moses..." />
           </div>
           <label class="switch-label">
             <input type="checkbox" id="events-only-pending" />
@@ -334,15 +351,75 @@
     </div>
   </main>
 
-  <!-- VIEW 3: COLLECTIBLES VAULT TRACKER -->
+  <!-- VIEW 3: PLAYER MECHANICS ("CÓMO HACERLO") & TROPHIES / ACHIEVEMENTS -->
+  <main class="view-section" id="view-guide">
+    <div class="page-container">
+      <div class="page-header">
+        <div class="page-header-left">
+          <img src="/extracted/blips/blip_map.png" alt="Guía del Jugador" class="header-emblem" />
+          <div>
+            <h1>GUÍA PRÁCTICA ("CÓMO HACERLO") Y TROFEOS</h1>
+            <p>Indicaciones claras sobre armas y maletero, Modo Enfoque, cómo ganar dinero rápido, robos limpios, caza perfecta, alertas de perdibles y lista interactiva de trofeos y logros de GTA VI.</p>
+          </div>
+        </div>
+        <div class="header-progress">
+          <div class="progress-row">
+            <span class="progress-label">TROFEOS CLAVE</span>
+            <strong class="mono" id="tr-progress-pct">0%</strong>
+          </div>
+          <div class="progress-track lg">
+            <div class="progress-fill" id="tr-progress-bar" style="width: 0%"></div>
+          </div>
+          <span class="muted mono" id="tr-progress-detail">0 de 0 desbloqueados</span>
+        </div>
+      </div>
+
+      <!-- ROADMAP & MISSABLE WARNING STRIP -->
+      <section class="roadmap-box" id="roadmap-box"></section>
+
+      <!-- SECTION A: MECHANICS PLAYBOOKS -->
+      <div class="section-divider-head">
+        <div>
+          <h2>MANUALES PASO A PASO ("CÓMO HACERLO")</h2>
+          <span class="muted">Aprende a dominar cada mecánica del juego sin rodeos ni spoilers.</span>
+        </div>
+        <div class="filter-strip" id="mech-cat-pills"></div>
+      </div>
+      <div class="mechanics-grid" id="mechanics-grid"></div>
+
+      <!-- SECTION B: TROPHIES & ACHIEVEMENTS CHECKLIST -->
+      <div class="section-divider-head" style="margin-top: 26px;">
+        <div>
+          <h2>GUÍA Y CHECKLIST DE TROFEOS / LOGROS</h2>
+          <span class="muted">55 trofeos totales · 100% para un jugador · Marca los que vayas desbloqueando.</span>
+        </div>
+      </div>
+      <div class="toolbar-row">
+        <div class="filter-strip" id="trophy-cat-pills"></div>
+        <div class="toolbar-right">
+          <div class="search-box compact">
+            <img src="/extracted/blips/ui_search.png" alt="" class="ui-icon search-icon" />
+            <input type="text" id="trophy-search" placeholder="Buscar trofeo, perdible, WAiNK..." />
+          </div>
+          <label class="switch-label">
+            <input type="checkbox" id="trophy-only-pending" />
+            <span>Solo pendientes</span>
+          </label>
+        </div>
+      </div>
+      <div class="trophies-grid" id="trophies-grid"></div>
+    </div>
+  </main>
+
+  <!-- VIEW 4: COLLECTIBLES VAULT TRACKER -->
   <main class="view-section" id="view-collectibles">
     <div class="page-container">
       <div class="page-header">
         <div class="page-header-left">
           <img src="/extracted/branding/gta6_vi_palms.png" alt="GTA VI" class="header-emblem" />
           <div>
-            <h1>BOVEDA DE COLECCIONABLES</h1>
-            <p>Medallas doradas, los 11 Ojos Secretos (WAiNK), fauna terrestre y marina de Leonida, cartas coleccionables, comics, campos de tiro y lugares emblematicos para seguir tu progreso.</p>
+            <h1>BÓVEDA DE COLECCIONABLES</h1>
+            <p>Medallas doradas, los 11 Ojos Secretos (WAiNK), fauna terrestre y marina de Leonida, cartas coleccionables, cómics, campos de tiro y lugares emblemáticos con indicaciones de cómo conseguir cada uno.</p>
           </div>
         </div>
         <div class="header-progress">
@@ -375,15 +452,15 @@
     </div>
   </main>
 
-  <!-- VIEW 4: ARSENAL, GARAGE & LICENSE PLATES -->
+  <!-- VIEW 5: ARSENAL, GARAGE & LICENSE PLATES -->
   <main class="view-section" id="view-arsenal">
     <div class="page-container">
       <div class="page-header">
         <div class="page-header-left">
           <img src="/extracted/branding/leonida_great_seal.png" alt="Leonida" class="header-emblem round" />
           <div>
-            <h1>ARSENAL, VEHICULOS Y MATRICULAS</h1>
-            <p>Catalogo completo de armas de fuego, pistolas, equipo tactico, deportivos, motos, embarcaciones, hidrodeslizadores y matriculas del Estado de Leonida y Gloriana.</p>
+            <h1>ARSENAL, VEHÍCULOS Y MATRÍCULAS</h1>
+            <p>Catálogo completo de armas de fuego, pistolas, equipo táctico, deportivos, motos, embarcaciones, hidrodeslizadores y matrículas con indicaciones de uso y dónde encontrarlos.</p>
           </div>
         </div>
         <div class="toolbar-right">
@@ -402,7 +479,7 @@
     </div>
   </main>
 
-  <!-- VIEW 5: DISTRICTS, WORDMARKS & MAP ICONS -->
+  <!-- VIEW 6: DISTRICTS, WORDMARKS & MAP ICONS -->
   <main class="view-section" id="view-blips">
     <div class="page-container">
       <div class="page-header">
@@ -410,7 +487,7 @@
           <img src="/extracted/blips/blip_radar.png" alt="" class="header-emblem" />
           <div>
             <h1>DISTRITOS, INSIGNIAS E ICONOS DEL MAPA</h1>
-            <p>Explora los 48 rotulos de barrios y condados de Leonida, insignias policiales y todos los iconos del radar. Haz clic en cualquier icono para colocar un marcador propio en el mapa.</p>
+            <p>Explora los 48 rótulos de barrios y condados de Leonida, insignias policiales y todos los iconos del radar. Haz clic en cualquier icono para colocar un marcador propio en el mapa.</p>
           </div>
         </div>
       </div>
@@ -422,6 +499,23 @@
       <div class="blips-catalog-grid" id="blips-catalog-grid"></div>
     </div>
   </main>
+
+  <!-- MODAL: GLOBAL INSTANT SEARCH (CTRL+K) -->
+  <div class="modal-backdrop hidden" id="global-search-backdrop" role="dialog" aria-modal="true" aria-label="Buscador global de Leonida">
+    <div class="cmd-card">
+      <div class="cmd-input-row">
+        <img src="/extracted/blips/ui_search.png" alt="" class="ui-icon" />
+        <input type="text" id="global-search-input" placeholder="Busca en todo el atlas: Kirk, Bret, dinero, maletero, caimán, WAiNK, trofeo..." autocomplete="off" />
+        <span class="cmd-esc mono">ESC</span>
+      </div>
+      <div class="cmd-results" id="global-search-results"></div>
+      <div class="cmd-foot mono">
+        <span>↑↓ Navegar</span>
+        <span>Enter Abrir</span>
+        <span>Esc Cerrar</span>
+      </div>
+    </div>
+  </div>
 
   <!-- MODAL: CREATE / EDIT COMMUNITY PIN -->
   <div class="modal-backdrop hidden" id="pin-modal-backdrop" role="dialog" aria-modal="true" aria-labelledby="pin-modal-title">
@@ -444,11 +538,11 @@
 
         <div class="form-grid-2">
           <label class="field">
-            <span>TITULO *</span>
+            <span>TÍTULO *</span>
             <input type="text" id="pin-title" required maxlength="120" placeholder="Ej. Flamenco de la coca, Efigie del Skunk Ape..." />
           </label>
           <label class="field">
-            <span>CATEGORIA</span>
+            <span>CATEGORÍA</span>
             <select id="pin-category"></select>
           </label>
         </div>
@@ -469,8 +563,8 @@
         </div>
 
         <label class="field">
-          <span>DESCRIPCION Y DETALLES</span>
-          <textarea id="pin-description" rows="3" maxlength="1000" placeholder="Describe como encontrarlo, requisitos, horarios o recompensas..."></textarea>
+          <span>DESCRIPCIÓN Y DETALLES</span>
+          <textarea id="pin-description" rows="3" maxlength="1000" placeholder="Describe cómo encontrarlo, requisitos, horarios o recompensas..."></textarea>
         </label>
 
         <div class="form-grid-2">

@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
+  <url><loc>https://gta6-leonida-atlas.vercel.app/</loc><changefreq>weekly</changefreq></url>
+  <url><loc>https://gta6-leonida-atlas.vercel.app/?view=events</loc><changefreq>weekly</changefreq></url>
+  <url><loc>https://gta6-leonida-atlas.vercel.app/?view=guide</loc><changefreq>weekly</changefreq></url>
+  <url><loc>https://gta6-leonida-atlas.vercel.app/?view=collectibles</loc><changefreq>weekly</changefreq></url>
+  <url><loc>https://gta6-leonida-atlas.vercel.app/?view=arsenal</loc><changefreq>weekly</changefreq></url>
+  <url><loc>https://gta6-leonida-atlas.vercel.app/?view=blips</loc><changefreq>weekly</changefreq></url>
+</urlset>

@@ -60,12 +60,13 @@ def load_markers_doc() -> dict:
 
 
 def load_progress_doc() -> dict:
-    doc = read_json(PROGRESS_FILE, {"foundMarkers": [], "foundCollectibles": [], "completedEvents": [], "updatedAt": utc_now()})
+    doc = read_json(PROGRESS_FILE, {"foundMarkers": [], "foundCollectibles": [], "completedEvents": [], "unlockedTrophies": [], "updatedAt": utc_now()})
     if not isinstance(doc, dict):
-        doc = {"foundMarkers": [], "foundCollectibles": [], "completedEvents": [], "updatedAt": utc_now()}
+        doc = {"foundMarkers": [], "foundCollectibles": [], "completedEvents": [], "unlockedTrophies": [], "updatedAt": utc_now()}
     doc.setdefault("foundMarkers", [])
     doc.setdefault("foundCollectibles", [])
     doc.setdefault("completedEvents", [])
+    doc.setdefault("unlockedTrophies", [])
     return doc
 
 
@@ -262,17 +263,19 @@ class CommunityMapHandler(SimpleHTTPRequestHandler):
                 self._send_json(200, {"ok": True, "saved_count": len(doc["markers"])})
                 return
 
-            # Save user checklist progress (found markers + found collectibles + completed events)
+            # Save user checklist progress (found markers + found collectibles + completed events + trophies)
             if path == "/api/progress":
                 body = self._read_body_json()
                 found_markers = sorted({str(x) for x in body.get("foundMarkers", []) if x})
                 found_colls = sorted({str(x) for x in body.get("foundCollectibles", []) if x})
                 completed_events = sorted({str(x) for x in body.get("completedEvents", []) if x})
+                unlocked_trophies = sorted({str(x) for x in body.get("unlockedTrophies", []) if x})
                 with STATE_LOCK:
                     doc = {
                         "foundMarkers": found_markers,
                         "foundCollectibles": found_colls,
                         "completedEvents": completed_events,
+                        "unlockedTrophies": unlocked_trophies,
                         "updatedAt": utc_now(),
                     }
                     write_json(PROGRESS_FILE, doc)

@@ -1,7 +1,7 @@
 /* ==========================================================================
-   GTA VI — Atlas y Guia Interactiva de Leonida
-   Mapa Completo · Eventos y Extranos y Locos · Coleccionables · Arsenal
-   Compatible con despliegue estatico en Vercel (localStorage) y servidor local
+   GTA VI — Atlas y Guía Interactiva de Leonida
+   Mapa Completo · Eventos y Extraños y Locos · Guía y Trofeos · Coleccionables · Arsenal
+   Compatible con despliegue estático en Vercel (localStorage) y servidor local
    ========================================================================== */
 
 (() => {
@@ -13,25 +13,25 @@
   const CATEGORIES = {
     event:       { label: "Eventos",    blip: "blip_contact" },
     landmark:    { label: "Lugares",    blip: "blip_landmark" },
-    collectible: { label: "Botin",      blip: "blip_collectible" },
+    collectible: { label: "Botín",      blip: "blip_collectible" },
     secret:      { label: "Secretos",   blip: "blip_secret" },
     weapon:      { label: "Armas",      blip: "blip_weapon" },
     heist:       { label: "Golpes",     blip: "blip_heist" },
     property:    { label: "Moteles",    blip: "blip_motel" },
-    vehicle:     { label: "Vehiculos",  blip: "blip_vehicle" },
+    vehicle:     { label: "Vehículos",  blip: "blip_vehicle" },
     activity:    { label: "Carreras",   blip: "blip_race" },
     food:        { label: "Comida",     blip: "blip_food" },
     nightlife:   { label: "Clubs",      blip: "blip_nightclub" },
     commerce:    { label: "Tiendas",    blip: "blip_shop" },
     service:     { label: "Talleres",   blip: "blip_garage" },
     wildlife:    { label: "Fauna",      blip: "blip_wildlife" },
-    law:         { label: "Policia",    blip: "blip_police" },
+    law:         { label: "Policía",    blip: "blip_police" },
     navigation:  { label: "Radar",      blip: "blip_radar" },
   };
 
   const EVENT_TYPES = [
     { id: "all",      label: "Todos",              blip: "blip_contact" },
-    { id: "stranger", label: "Extranos y Locos",   blip: "logo_bigfoot" },
+    { id: "stranger", label: "Extraños y Peristas",blip: "logo_bigfoot" },
     { id: "random",   label: "Eventos Aleatorios", blip: "blip_mystery_rooster" },
     { id: "hunting",  label: "Caza Legendaria",    blip: "blip_hunting" },
     { id: "activity", label: "Actividades 100%",   blip: "blip_race" },
@@ -39,22 +39,39 @@
   ];
 
   const EVENT_TYPE_LABEL = {
-    stranger: "Extranos y Locos",
+    stranger: "Extraños / Perista",
     random:   "Evento Aleatorio",
     hunting:  "Caza Legendaria",
     activity: "Actividad 100%",
     secret:   "Secreto",
   };
 
+  const MECH_CATEGORIES = [
+    { id: "all",     label: "Todos los Manuales" },
+    { id: "combat",  label: "Armas y Combate" },
+    { id: "money",   label: "Dinero y Robos" },
+    { id: "explore", label: "Caza y 100%" },
+    { id: "atlas",   label: "Uso del Atlas" },
+  ];
+
+  const TROPHY_CATEGORIES = [
+    { id: "all",       label: "Todos" },
+    { id: "missable",  label: "Perdibles" },
+    { id: "strangers", label: "Extraños y Locos" },
+    { id: "explore",   label: "Exploración y 100%" },
+    { id: "combat",    label: "Combate y Robos" },
+    { id: "story",     label: "Historia" },
+  ];
+
   const COLL_CATEGORIES = [
     { id: "all",       label: "Todos",      blip: "blip_collectible" },
     { id: "medals",    label: "Medallas",   blip: "blip_chest" },
     { id: "cards",     label: "Cartas",     blip: "blip_cards" },
-    { id: "comics",    label: "Comics",     blip: "blip_diamond" },
+    { id: "comics",    label: "Cómics",     blip: "blip_diamond" },
     { id: "secrets",   label: "Secretos",   blip: "blip_secret" },
     { id: "wildlife",  label: "Fauna",      blip: "blip_wildlife" },
     { id: "locations", label: "Locaciones", blip: "blip_landmark" },
-    { id: "vehicles",  label: "Vehiculos",  blip: "blip_vehicle" },
+    { id: "vehicles",  label: "Vehículos",  blip: "blip_vehicle" },
   ];
 
   const COLL_CAT_LABEL = Object.fromEntries(COLL_CATEGORIES.map((c) => [c.id, c.label]));
@@ -67,14 +84,14 @@
     { id: "gear",      label: "Equipo / Melee" },
     { id: "supercars", label: "Superdeportivos" },
     { id: "muscle",    label: "Muscle" },
-    { id: "classics",  label: "Clasicos" },
+    { id: "classics",  label: "Clásicos" },
     { id: "luxury",    label: "Lujo" },
     { id: "offroad",   label: "Off-Road" },
     { id: "bikes",     label: "Motos" },
     { id: "aircraft",  label: "Aeronaves" },
-    { id: "boats",     label: "Nautica" },
-    { id: "military",  label: "Policia / Militar" },
-    { id: "plates",    label: "Matriculas" },
+    { id: "boats",     label: "Náutica" },
+    { id: "military",  label: "Policía / Militar" },
+    { id: "plates",    label: "Matrículas" },
   ];
 
   const ARSENAL_CAT_MAP = Object.fromEntries(ARSENAL_CATEGORIES.map((c) => [c.id, c.label]));
@@ -88,7 +105,7 @@
     { id: "collectible",label: "Coleccionables" },
     { id: "landmark",   label: "Lugares" },
     { id: "weapon",     label: "Armas" },
-    { id: "vehicle",    label: "Vehiculos" },
+    { id: "vehicle",    label: "Vehículos" },
     { id: "property",   label: "Propiedades" },
     { id: "commerce",   label: "Comercio" },
     { id: "activity",   label: "Actividades" },
@@ -114,12 +131,14 @@
     blipFileMap: new Map(),
     events: [],
     guide100: null,
+    guides: { roadmap: null, mechanics: [], trophies: [] },
     baseMarkers: [],
     markers: [],
     userPins: { added: [], overrides: {}, deleted: [], votes: {}, comments: {} },
     foundMarkers: new Set(),
     foundCollectibles: new Set(),
     completedEvents: new Set(),
+    unlockedTrophies: new Set(),
     hasLocalApi: false,
 
     activeView: "map",
@@ -128,6 +147,7 @@
     mapTheme: "night",
     selectedMarkerId: null,
     highlightedEventId: null,
+    highlightedGuideId: null,
 
     enabledCategories: new Set(Object.keys(CATEGORIES)),
     searchQuery: "",
@@ -164,10 +184,18 @@
     preferredBlip: "blip_pin",
     modalSelectedBlip: "blip_pin",
 
+    // Global search command palette
+    cmdItems: [],
+    cmdActiveIdx: 0,
+
     // Sub-view filters
     eventType: "all",
     eventSearch: "",
     eventsOnlyPending: false,
+    mechCat: "all",
+    trophyCat: "all",
+    trophySearch: "",
+    trophiesOnlyPending: false,
     collCat: "all",
     collSearch: "",
     collOnlyPending: false,
@@ -175,6 +203,13 @@
     arsenalSearch: "",
     blipGroup: "wordmarks",
   };
+
+  function norm(str) {
+    return String(str ?? "")
+      .normalize("NFD")
+      .replace(/[\u0300-\u036f]/g, "")
+      .toLowerCase();
+  }
 
   function coordsToGridSector(xPct, yPct) {
     const colIdx = Math.max(0, Math.min(8, Math.floor((xPct / 100) * 9)));
@@ -284,6 +319,7 @@
         state.foundMarkers = new Set(p.foundMarkers || []);
         state.foundCollectibles = new Set(p.foundCollectibles || []);
         state.completedEvents = new Set(p.completedEvents || []);
+        state.unlockedTrophies = new Set(p.unlockedTrophies || []);
       }
     } catch (_) { /* noop */ }
 
@@ -343,10 +379,11 @@
     try {
       const isLocalHost = ["127.0.0.1", "localhost"].includes(window.location.hostname);
 
-      const [manifest, markersDoc, eventsDoc] = await Promise.all([
+      const [manifest, markersDoc, eventsDoc, guidesDoc] = await Promise.all([
         fetchStaticFirst("/data/assets.json", isLocalHost ? "/api/assets" : null),
         fetchStaticFirst("/data/markers.json", isLocalHost ? "/api/markers" : null),
         fetchStaticFirst("/data/events.json", isLocalHost ? "/api/events" : null),
+        fetchStaticFirst("/data/guides.json", null).catch(() => ({ roadmap: null, mechanics: [], trophies: [] })),
       ]);
 
       state.manifest = manifest;
@@ -354,6 +391,11 @@
       state.baseMarkers = markersDoc.markers || [];
       state.events = eventsDoc.events || [];
       state.guide100 = eventsDoc.guide100 || null;
+      state.guides = {
+        roadmap: guidesDoc?.roadmap || null,
+        mechanics: guidesDoc?.mechanics || [],
+        trophies: guidesDoc?.trophies || [],
+      };
 
       loadLocalState();
 
@@ -367,6 +409,7 @@
             for (const x of pdoc.foundMarkers || []) state.foundMarkers.add(x);
             for (const x of pdoc.foundCollectibles || []) state.foundCollectibles.add(x);
             for (const x of pdoc.completedEvents || []) state.completedEvents.add(x);
+            for (const x of pdoc.unlockedTrophies || []) state.unlockedTrophies.add(x);
           }
         } catch (_) {
           state.hasLocalApi = false;
@@ -400,6 +443,7 @@
       const qArsenal = qp.get("arsenal");
       const qEventType = qp.get("type");
       const qEventId = qp.get("event");
+      const qSearch = qp.get("search");
 
       if (qBlips && BLIP_GROUPS.some((g) => g.id === qBlips)) {
         state.blipGroup = qBlips;
@@ -430,19 +474,23 @@
       loadFullLeonidaMap();
       renderGuide100Box();
       renderEventsView();
+      renderGuideView();
       renderCollectiblesView();
       renderArsenalView();
       renderBlipsView();
       updateGlobalProgressCounters();
 
-      if (qView && ["map", "events", "collectibles", "arsenal", "blips"].includes(qView)) {
+      if (qView && ["map", "events", "guide", "collectibles", "arsenal", "blips"].includes(qView)) {
         switchView(qView);
       } else if (qEventId) {
         switchView("events");
       }
+      if (qSearch) {
+        openGlobalSearch(qSearch);
+      }
     } catch (err) {
       console.error(err);
-      toast(`Error al inicializar la guia: ${err.message}`, true);
+      toast(`Error al inicializar la guía: ${err.message}`, true);
     }
   }
 
@@ -515,7 +563,32 @@
         const card = document.querySelector(`[data-event-card="${CSS.escape(state.highlightedEventId)}"]`);
         if (card) card.scrollIntoView({ behavior: "smooth", block: "center" });
       });
+    } else if (viewName === "guide" && state.highlightedGuideId) {
+      requestAnimationFrame(() => {
+        const card = document.querySelector(`[data-guide-card="${CSS.escape(state.highlightedGuideId)}"]`);
+        if (card) card.scrollIntoView({ behavior: "smooth", block: "center" });
+      });
     }
+  }
+
+  function jumpToMarkerOnMap(markerId) {
+    const mk = state.markers.find((x) => x.id === markerId);
+    if (!mk) {
+      toast("Marcador no encontrado en el mapa.", true);
+      return;
+    }
+    if (mk.category) state.enabledCategories.add(mk.category);
+    state.hideFound = false;
+    $("chk-hide-found").checked = false;
+    state.searchQuery = "";
+    $("map-search").value = "";
+    $("btn-clear-search").classList.add("hidden");
+    renderCategoryFilters();
+    switchView("map");
+    requestAnimationFrame(() => {
+      openInspector(mk.id, true, 4.8, true);
+      if (mk.wordmark) showZoneWordmark(mk.wordmark);
+    });
   }
 
   // =========================================================================
@@ -560,7 +633,7 @@
     $("btn-theme-night").classList.toggle("active", !isDay);
     $("btn-theme-day").classList.toggle("active", isDay);
     $("map-viewport").classList.toggle("day-mode", isDay);
-    $("hud-source").textContent = isDay ? "MODO DIA" : "MODO NOCHE";
+    $("hud-source").textContent = isDay ? "MODO DÍA" : "MODO NOCHE";
     if (m) {
       $("minimap-img").src = isDay ? (m.minimapDay || m.dayFile) : (m.minimapNight || m.nightFile);
     }
@@ -801,12 +874,12 @@
   }
 
   function getFilteredMarkers() {
-    const q = state.searchQuery.trim().toLowerCase();
+    const q = norm(state.searchQuery.trim());
     return getMapMarkers().filter((m) => {
       if (!state.enabledCategories.has(m.category)) return false;
       if (state.hideFound && state.foundMarkers.has(m.id)) return false;
       if (q) {
-        const hay = `${m.title} ${m.region} ${m.description} ${CATEGORIES[m.category]?.label || ""}`.toLowerCase();
+        const hay = norm(`${m.title} ${m.region} ${m.description} ${m.howTo || ""} ${CATEGORIES[m.category]?.label || ""}`);
         if (!hay.includes(q)) return false;
       }
       return true;
@@ -917,10 +990,10 @@
       ? (EVENT_TYPE_LABEL[linkedEvent.type] || "Evento")
       : (CATEGORIES[m.category]?.label || m.category);
     $("insp-title").textContent = m.title;
-    $("insp-desc").textContent = m.description || "Sin descripcion adicional.";
+    $("insp-desc").textContent = m.description || "Sin descripción adicional.";
     $("insp-region").textContent = m.region || guessCountyLabel(m.x, m.y);
     $("insp-coords").textContent = `${coordsToGridSector(m.x, m.y)} · ${m.x.toFixed(1)}, ${m.y.toFixed(1)}`;
-    $("insp-author").textContent = m.author || "Guia de Leonida";
+    $("insp-author").textContent = m.author || "Guía de Leonida";
     $("insp-votes").textContent = String(m.votes || 0);
 
     const wmBar = $("insp-wordmark-bar");
@@ -939,33 +1012,45 @@
       if (linkedEvent.character) badges.push(`<span class="badge">${esc(linkedEvent.character)}</span>`);
       if (linkedEvent.missable) badges.push(`<span class="ev-pill missable">Perdible</span>`);
     } else {
-      if (m.verified) badges.push(`<span class="badge verified">Guia Oficial</span>`);
+      if (m.verified) badges.push(`<span class="badge verified">Guía Oficial</span>`);
       else badges.push(`<span class="badge">Pin Comunitario</span>`);
     }
     if (isFound) badges.push(`<span class="badge found">Encontrado</span>`);
     $("insp-badges").innerHTML = badges.join("");
 
+    const howtoBox = $("insp-howto-box");
     const evGuideEl = $("insp-event-guide");
     if (linkedEvent) {
+      howtoBox.classList.add("hidden");
       const stepsHtml = (linkedEvent.steps || [])
         .map((s) => `<li>${esc(s)}</li>`)
         .join("");
+      const tipsHtml = (linkedEvent.tips || [])
+        .map((t) => `<li>${esc(t)}</li>`)
+        .join("");
       evGuideEl.innerHTML = `
         <div>
-          <span class="insp-ev-k">COMO EMPEZAR</span>
+          <span class="insp-ev-k">CÓMO EMPEZAR</span>
           <span>${esc(linkedEvent.howToStart)}</span>
         </div>
-        ${stepsHtml ? `<div><span class="insp-ev-k">PASOS DE LA MISION</span><ol class="insp-ev-steps">${stepsHtml}</ol></div>` : ""}
+        ${stepsHtml ? `<div><span class="insp-ev-k">PASOS DE LA MISIÓN</span><ol class="insp-ev-steps">${stepsHtml}</ol></div>` : ""}
         <div>
           <span class="insp-ev-k">RECOMPENSA</span>
           <span>${esc(linkedEvent.reward)}</span>
         </div>
+        ${tipsHtml ? `<div><span class="insp-ev-k">CONSEJOS</span><ul class="insp-ev-steps">${tipsHtml}</ul></div>` : ""}
         <button type="button" class="btn btn-sm btn-flat" data-open-event="${esc(linkedEvent.id)}">VER EN EVENTOS Y MISIONES</button>
       `;
       evGuideEl.classList.remove("hidden");
     } else {
       evGuideEl.classList.add("hidden");
       evGuideEl.innerHTML = "";
+      if (m.howTo) {
+        $("insp-howto-text").textContent = m.howTo;
+        howtoBox.classList.remove("hidden");
+      } else {
+        howtoBox.classList.add("hidden");
+      }
     }
 
     const foundBtn = $("btn-insp-found");
@@ -993,7 +1078,7 @@
     $("insp-comments-count").textContent = String(comms.length);
     const list = $("insp-comments-list");
     if (!comms.length) {
-      list.innerHTML = `<div class="muted">Sin notas aun. Comparte un consejo o pista sobre este lugar.</div>`;
+      list.innerHTML = `<div class="muted">Sin notas aún. Comparte un consejo o pista sobre este lugar.</div>`;
       return;
     }
     list.innerHTML = comms
@@ -1151,6 +1236,7 @@
       foundMarkers: Array.from(state.foundMarkers),
       foundCollectibles: Array.from(state.foundCollectibles),
       completedEvents: Array.from(state.completedEvents),
+      unlockedTrophies: Array.from(state.unlockedTrophies),
     };
     try {
       localStorage.setItem(LS_PROGRESS, JSON.stringify(payload));
@@ -1176,6 +1262,16 @@
     $("ev-progress-pct").textContent = `${evPct}%`;
     $("ev-progress-bar").style.width = `${evPct}%`;
     $("ev-progress-detail").textContent = `${doneEv} de ${totalEv} completados`;
+
+    const totalTr = (state.guides.trophies || []).length;
+    const doneTr = state.unlockedTrophies.size;
+    const trPct = totalTr ? Math.round((doneTr / totalTr) * 100) : 0;
+    if ($("nav-trophy-count")) $("nav-trophy-count").textContent = `${doneTr}/${totalTr}`;
+    if ($("tr-progress-pct")) {
+      $("tr-progress-pct").textContent = `${trPct}%`;
+      $("tr-progress-bar").style.width = `${trPct}%`;
+      $("tr-progress-detail").textContent = `${doneTr} de ${totalTr} desbloqueados`;
+    }
 
     const totalColls = (state.manifest.collectibles || []).length;
     const foundColls = state.foundCollectibles.size;
@@ -1234,12 +1330,12 @@
         </button>`;
     }).join("");
 
-    const q = state.eventSearch.trim().toLowerCase();
+    const q = norm(state.eventSearch.trim());
     const filtered = allEvents.filter((ev) => {
       if (state.eventType !== "all" && ev.type !== state.eventType) return false;
       if (state.eventsOnlyPending && state.completedEvents.has(ev.id)) return false;
       if (q) {
-        const hay = `${ev.title} ${ev.subtitle} ${ev.character} ${ev.chapter} ${ev.region} ${ev.summary} ${ev.howToStart} ${ev.reward} ${(ev.steps || []).join(" ")}`.toLowerCase();
+        const hay = norm(`${ev.title} ${ev.subtitle} ${ev.character} ${ev.chapter} ${ev.region} ${ev.summary} ${ev.howToStart} ${ev.reward} ${(ev.steps || []).join(" ")}`);
         if (!hay.includes(q)) return false;
       }
       return true;
@@ -1286,7 +1382,7 @@
               </div>
 
               <div class="event-meta-chips">
-                <span class="ev-meta-chip"><strong>Cuando:</strong> ${esc(ev.chapter)}</span>
+                <span class="ev-meta-chip"><strong>Cuándo:</strong> ${esc(ev.chapter)}</span>
                 <span class="ev-meta-chip"><strong>Personaje:</strong> ${esc(ev.character)}</span>
                 <span class="ev-meta-chip"><strong>Zona:</strong> ${esc(ev.region)}</span>
               </div>
@@ -1294,12 +1390,12 @@
               <p class="event-summary">${esc(ev.summary)}</p>
 
               <div class="event-start-box">
-                <strong>COMO EMPEZAR</strong>
+                <strong>CÓMO EMPEZAR</strong>
                 <span>${esc(ev.howToStart)}</span>
               </div>
 
               <details class="ev-details"${openByDefault ? " open" : ""}>
-                <summary>GUIA PASO A PASO, RECOMPENSA Y CONSEJOS</summary>
+                <summary>GUÍA PASO A PASO, RECOMPENSA Y CONSEJOS</summary>
                 <div class="ev-details-body">
                   ${stepsHtml ? `<ol class="ev-steps">${stepsHtml}</ol>` : ""}
                   <div class="ev-reward-line">
@@ -1331,7 +1427,150 @@
   }
 
   // =========================================================================
-  // VIEW 3: COLLECTIBLES VAULT
+  // VIEW 3: PLAYER MECHANICS ("CÓMO HACERLO") & TROPHIES / ACHIEVEMENTS
+  // =========================================================================
+  function renderGuideView() {
+    const checkIcon = blipUrl("ui_check");
+    const rm = state.guides.roadmap;
+    const rmBox = $("roadmap-box");
+    if (rmBox && rm) {
+      rmBox.innerHTML = `
+        <div class="roadmap-stats">
+          <div class="rm-stat"><span class="rm-stat-k">TROFEOS / LOGROS</span><span class="rm-stat-v">${esc(rm.totalTrophies)} (100% Un Jugador)</span></div>
+          <div class="rm-stat"><span class="rm-stat-k">DURACIÓN ESTIMADA</span><span class="rm-stat-v">${esc(rm.estimatedHours)}</span></div>
+          <div class="rm-stat"><span class="rm-stat-k">DIFICULTAD</span><span class="rm-stat-v">${esc(rm.difficulty)}</span></div>
+          <div class="rm-stat"><span class="rm-stat-k">MODO LIBRE FINAL</span><span class="rm-stat-v">Sí (sin bloqueo de 100%)</span></div>
+        </div>
+        <div class="rm-alerts">
+          <div class="rm-alert is-danger">
+            <strong>ALERTA DE PERDIBLES</strong>
+            <span>${esc(rm.missableAlert)}</span>
+          </div>
+          <div class="rm-alert">
+            <strong>AVISO DE TRUCOS</strong>
+            <span>${esc(rm.cheatWarning)}</span>
+          </div>
+        </div>
+      `;
+    }
+
+    // Section A: Mechanics Playbooks
+    const mechs = state.guides.mechanics || [];
+    $("mech-cat-pills").innerHTML = MECH_CATEGORIES.map((c) => {
+      const cnt = c.id === "all" ? mechs.length : mechs.filter((m) => m.category === c.id).length;
+      return `<button class="filter-pill${state.mechCat === c.id ? " active" : ""}" data-mech-cat="${c.id}">${esc(c.label)} (${cnt})</button>`;
+    }).join("");
+
+    const filteredMechs = mechs.filter((m) => state.mechCat === "all" || m.category === state.mechCat);
+    $("mechanics-grid").innerHTML = filteredMechs
+      .map((m, idx) => {
+        const isHi = state.highlightedGuideId === m.id;
+        const openByDefault = idx < 2 || isHi;
+        const ctrlsHtml = (m.controls || [])
+          .map(
+            (c) => `
+          <div class="mech-ctrl-chip">
+            <span class="mech-ctrl-key">${esc(c.key)}</span>
+            <span class="mech-ctrl-act">${esc(c.action)}</span>
+          </div>`
+          )
+          .join("");
+        const stepsHtml = (m.steps || []).map((s) => `<li>${esc(s)}</li>`).join("");
+        const tipsHtml = (m.tips || []).map((t) => `<li>${esc(t)}</li>`).join("");
+        return `
+          <article class="mech-card${isHi ? " is-highlighted" : ""}" data-guide-card="${esc(m.id)}">
+            <div class="event-head">
+              <img src="${blipUrl(m.blip)}" alt="" class="event-blip" />
+              <div class="event-title-wrap">
+                <h3 class="event-title">${esc(m.title)}</h3>
+                <span class="event-subtitle">${esc(m.subtitle)}</span>
+              </div>
+            </div>
+            <p class="event-summary">${esc(m.summary)}</p>
+            ${ctrlsHtml ? `<div class="mech-controls">${ctrlsHtml}</div>` : ""}
+            <details class="ev-details"${openByDefault ? " open" : ""}>
+              <summary>INDICACIONES PASO A PASO ("CÓMO HACERLO")</summary>
+              <div class="ev-details-body">
+                ${stepsHtml ? `<ol class="ev-steps">${stepsHtml}</ol>` : ""}
+                ${tipsHtml ? `<ul class="ev-tips-list">${tipsHtml}</ul>` : ""}
+              </div>
+            </details>
+            ${
+              m.markerId
+                ? `<div class="event-foot">
+                     <span class="muted">Ubicación de referencia en Leonida</span>
+                     <button type="button" class="btn btn-sm btn-flat" data-goto-marker="${esc(m.markerId)}">VER EN MAPA</button>
+                   </div>`
+                : ""
+            }
+          </article>`;
+      })
+      .join("");
+
+    // Section B: Trophies Checklist
+    const trophies = state.guides.trophies || [];
+    $("trophy-cat-pills").innerHTML = TROPHY_CATEGORIES.map((c) => {
+      const cnt =
+        c.id === "all"
+          ? trophies.length
+          : c.id === "missable"
+            ? trophies.filter((t) => t.missable).length
+            : trophies.filter((t) => t.category === c.id).length;
+      return `<button class="filter-pill${state.trophyCat === c.id ? " active" : ""}" data-trophy-cat="${c.id}">${esc(c.label)} (${cnt})</button>`;
+    }).join("");
+
+    const tq = norm(state.trophySearch.trim());
+    const filteredTr = trophies.filter((t) => {
+      if (state.trophyCat === "missable" && !t.missable) return false;
+      else if (state.trophyCat !== "all" && state.trophyCat !== "missable" && t.category !== state.trophyCat) return false;
+      if (state.trophiesOnlyPending && state.unlockedTrophies.has(t.id)) return false;
+      if (tq) {
+        const hay = norm(`${t.title} ${t.tier} ${t.requirement} ${t.howTo}`);
+        if (!hay.includes(tq)) return false;
+      }
+      return true;
+    });
+
+    const tGrid = $("trophies-grid");
+    if (!filteredTr.length) {
+      tGrid.innerHTML = `<div class="empty-state">No hay trofeos que coincidan con el filtro actual.</div>`;
+      return;
+    }
+
+    tGrid.innerHTML = filteredTr
+      .map((t) => {
+        const isDone = state.unlockedTrophies.has(t.id);
+        const isHi = state.highlightedGuideId === t.id;
+        return `
+          <article class="trophy-card${isDone ? " is-done" : ""}${isHi ? " is-highlighted" : ""}" data-guide-card="${esc(t.id)}">
+            <div class="trophy-top">
+              <h3 class="trophy-title">${esc(t.title)}</h3>
+              <div class="trophy-badges">
+                ${t.missable ? `<span class="ev-pill missable">Perdible</span>` : ""}
+                <span class="tier-pill tier-${esc(t.tier)}">${esc(t.tier)}</span>
+              </div>
+            </div>
+            <p class="trophy-req">${esc(t.requirement)}</p>
+            <div class="card-howto">
+              <strong>CÓMO CONSEGUIRLO:</strong>${esc(t.howTo)}
+            </div>
+            <div class="event-foot">
+              <div class="card-foot-actions">
+                ${t.markerId ? `<button type="button" class="btn btn-sm btn-flat" data-goto-marker="${esc(t.markerId)}">VER EN MAPA</button>` : ""}
+                ${t.eventId ? `<button type="button" class="btn btn-sm btn-flat" data-open-event="${esc(t.eventId)}">VER GUÍA</button>` : ""}
+              </div>
+              <button type="button" class="btn btn-sm ${isDone ? "btn-check is-found" : "btn-flat"}" data-toggle-trophy="${esc(t.id)}">
+                <img src="${checkIcon}" alt="" class="ui-icon" />
+                <span>${isDone ? "Desbloqueado" : "Marcar"}</span>
+              </button>
+            </div>
+          </article>`;
+      })
+      .join("");
+  }
+
+  // =========================================================================
+  // VIEW 4: COLLECTIBLES VAULT
   // =========================================================================
   function renderCollectiblesView() {
     const checkIcon = blipUrl("ui_check");
@@ -1346,12 +1585,12 @@
         </button>`;
     }).join("");
 
-    const q = state.collSearch.trim().toLowerCase();
+    const q = norm(state.collSearch.trim());
     const filtered = colls.filter((c) => {
       if (state.collCat !== "all" && c.category !== state.collCat) return false;
       if (state.collOnlyPending && state.foundCollectibles.has(c.id)) return false;
       if (q) {
-        const hay = `${c.title} ${c.description} ${c.category} ${COLL_CAT_LABEL[c.category] || ""}`.toLowerCase();
+        const hay = norm(`${c.title} ${c.description} ${c.howTo || ""} ${c.category} ${COLL_CAT_LABEL[c.category] || ""}`);
         if (!hay.includes(q)) return false;
       }
       return true;
@@ -1377,12 +1616,16 @@
             <div class="coll-body">
               <h3 class="coll-title">${esc(c.title)}</h3>
               <p class="coll-desc">${esc(c.description)}</p>
+              ${c.howTo ? `<div class="card-howto"><strong>CÓMO:</strong>${esc(c.howTo)}</div>` : ""}
               <div class="coll-foot">
                 <span class="muted">${esc(catLabel)}</span>
-                <button type="button" class="btn btn-sm ${isFound ? "btn-check is-found" : "btn-flat"}" data-toggle-coll="${esc(c.id)}">
-                  <img src="${checkIcon}" alt="" class="ui-icon" />
-                  <span>${isFound ? "Completado" : "Marcar"}</span>
-                </button>
+                <div class="card-foot-actions">
+                  ${c.markerId ? `<button type="button" class="btn btn-sm btn-flat" data-goto-marker="${esc(c.markerId)}" title="Ver zona en el mapa">MAPA</button>` : ""}
+                  <button type="button" class="btn btn-sm ${isFound ? "btn-check is-found" : "btn-flat"}" data-toggle-coll="${esc(c.id)}">
+                    <img src="${checkIcon}" alt="" class="ui-icon" />
+                    <span>${isFound ? "Completado" : "Marcar"}</span>
+                  </button>
+                </div>
               </div>
             </div>
           </article>`;
@@ -1391,7 +1634,7 @@
   }
 
   // =========================================================================
-  // VIEW 4: ARSENAL, VEHICLES & LICENSE PLATES
+  // VIEW 5: ARSENAL, VEHICLES & LICENSE PLATES
   // =========================================================================
   function renderArsenalView() {
     const items = state.manifest.arsenal || [];
@@ -1406,11 +1649,11 @@
         </button>`;
     }).join("");
 
-    const q = state.arsenalSearch.trim().toLowerCase();
+    const q = norm(state.arsenalSearch.trim());
     const filtered = items.filter((a) => {
       if (state.arsenalCat !== "all" && a.category !== state.arsenalCat) return false;
       if (q) {
-        const hay = `${a.title} ${a.description} ${a.category} ${ARSENAL_CAT_MAP[a.category] || ""}`.toLowerCase();
+        const hay = norm(`${a.title} ${a.description} ${a.howTo || ""} ${a.category} ${ARSENAL_CAT_MAP[a.category] || ""}`);
         if (!hay.includes(q)) return false;
       }
       return true;
@@ -1418,7 +1661,7 @@
 
     const grid = $("arsenal-grid");
     if (!filtered.length) {
-      grid.innerHTML = `<div class="empty-state">No hay elementos en Arsenal o Garaje que coincidan con la busqueda.</div>`;
+      grid.innerHTML = `<div class="empty-state">No hay elementos en Arsenal o Garaje que coincidan con la búsqueda.</div>`;
       return;
     }
 
@@ -1431,7 +1674,7 @@
             : "is-vehicle";
         const catLabel = ARSENAL_CAT_MAP[a.category] || a.category;
         return `
-          <article class="arsenal-card">
+          <article class="arsenal-card" data-arsenal-id="${esc(a.id)}">
             <div class="arsenal-stage ${stageCls}"
                  data-lightbox-src="${esc(a.file)}"
                  data-lightbox-title="${esc(a.title)}"
@@ -1442,6 +1685,15 @@
             <div class="arsenal-body">
               <h3 class="arsenal-title">${esc(a.title)}</h3>
               <p class="arsenal-desc">${esc(a.description)}</p>
+              ${a.howTo ? `<div class="card-howto"><strong>DÓNDE / USO:</strong>${esc(a.howTo)}</div>` : ""}
+              ${
+                a.markerId
+                  ? `<div class="arsenal-foot">
+                       <span class="muted">${esc(catLabel)}</span>
+                       <button type="button" class="btn btn-sm btn-flat" data-goto-marker="${esc(a.markerId)}">VER EN MAPA</button>
+                     </div>`
+                  : ""
+              }
             </div>
           </article>`;
       })
@@ -1521,18 +1773,269 @@
   }
 
   // =========================================================================
+  // GLOBAL INSTANT SEARCH COMMAND PALETTE (CTRL+K)
+  // =========================================================================
+  const QUICK_SEARCH_CHIPS = [
+    "Kirk Skunk Ape",
+    "Bret Vogel caza",
+    "Ganar dinero rápido",
+    "Meditación perdible",
+    "Maletero armas",
+    "Flamencos",
+    "WAiNK",
+    "Campos de tiro",
+    "Moses",
+    "Yasmani",
+  ];
+
+  function openGlobalSearch(initialQuery = "") {
+    $("global-search-backdrop").classList.remove("hidden");
+    const inp = $("global-search-input");
+    inp.value = initialQuery;
+    renderGlobalSearchResults(initialQuery);
+    setTimeout(() => {
+      inp.focus();
+      inp.select();
+    }, 20);
+  }
+
+  function closeGlobalSearch() {
+    $("global-search-backdrop").classList.add("hidden");
+  }
+
+  function renderGlobalSearchResults(rawQuery) {
+    const box = $("global-search-results");
+    const q = norm((rawQuery || "").trim());
+
+    if (!q) {
+      state.cmdItems = [];
+      state.cmdActiveIdx = 0;
+      box.innerHTML = `
+        <div class="cmd-quick-wrap">
+          <div class="cmd-group-head">BÚSQUEDAS RÁPIDAS POPULARES</div>
+          <div class="cmd-quick-chips">
+            ${QUICK_SEARCH_CHIPS.map((c) => `<button type="button" class="cmd-chip" data-quick-q="${esc(c)}">${esc(c)}</button>`).join("")}
+          </div>
+          <div class="muted">Escribe cualquier personaje, misión, arma, coche, animal, trofeo o sector del mapa (ej. "G-7", "caimán", "dinero", "perdible").</div>
+        </div>`;
+      return;
+    }
+
+    const terms = q.split(/\s+/).filter(Boolean);
+    const matches = (hay) => {
+      const h = norm(hay);
+      return terms.every((t) => h.includes(t));
+    };
+
+    const groups = [];
+    const flat = [];
+
+    const addGroup = (label, items) => {
+      if (!items.length) return;
+      groups.push({ label, items: items.map((it) => ({ ...it, _idx: flat.push(it) - 1 })) });
+    };
+
+    // 1. Events & Strangers
+    addGroup(
+      "Eventos, Extraños y Peristas",
+      state.events
+        .filter((e) => matches(`${e.title} ${e.subtitle} ${e.character} ${e.region} ${e.summary} ${e.howToStart} ${e.trophy}`))
+        .slice(0, 6)
+        .map((e) => ({
+          kind: "event",
+          id: e.id,
+          title: e.title,
+          sub: `${e.chapter} · ${e.region}`,
+          tag: EVENT_TYPE_LABEL[e.type] || "Evento",
+          icon: blipUrl(e.blip),
+        }))
+    );
+
+    // 2. Mechanics & Trophies
+    const guideMatches = [];
+    for (const m of state.guides.mechanics || []) {
+      if (matches(`${m.title} ${m.subtitle} ${m.summary} ${(m.steps || []).join(" ")}`)) {
+        guideMatches.push({
+          kind: "mechanic",
+          id: m.id,
+          title: m.title,
+          sub: m.subtitle,
+          tag: "Manual",
+          icon: blipUrl(m.blip),
+        });
+      }
+    }
+    for (const t of state.guides.trophies || []) {
+      if (matches(`${t.title} ${t.tier} ${t.requirement} ${t.howTo} ${t.missable ? "perdible" : ""}`)) {
+        guideMatches.push({
+          kind: "trophy",
+          id: t.id,
+          title: t.title,
+          sub: t.requirement,
+          tag: t.missable ? "Perdible" : `Trofeo ${t.tier}`,
+          icon: blipUrl("blip_chest"),
+        });
+      }
+    }
+    addGroup("Guía del Jugador y Trofeos", guideMatches.slice(0, 6));
+
+    // 3. Map Markers
+    addGroup(
+      "Ubicaciones en el Mapa",
+      state.markers
+        .filter((m) => matches(`${m.title} ${m.region} ${m.description} ${m.howTo || ""} ${CATEGORIES[m.category]?.label || ""}`))
+        .slice(0, 7)
+        .map((m) => ({
+          kind: "marker",
+          id: m.id,
+          title: m.title,
+          sub: m.region || guessCountyLabel(m.x, m.y),
+          tag: CATEGORIES[m.category]?.label || "Mapa",
+          icon: blipUrl(m.blip),
+        }))
+    );
+
+    // 4. Collectibles
+    addGroup(
+      "Coleccionables",
+      (state.manifest.collectibles || [])
+        .filter((c) => matches(`${c.title} ${c.description} ${c.howTo || ""} ${COLL_CAT_LABEL[c.category] || ""}`))
+        .slice(0, 5)
+        .map((c) => ({
+          kind: "collectible",
+          id: c.id,
+          title: c.title,
+          sub: c.description,
+          tag: COLL_CAT_LABEL[c.category] || "Coleccionable",
+          icon: c.thumb || c.file,
+        }))
+    );
+
+    // 5. Arsenal & Garage
+    addGroup(
+      "Arsenal y Garaje",
+      (state.manifest.arsenal || [])
+        .filter((a) => matches(`${a.title} ${a.description} ${a.howTo || ""} ${ARSENAL_CAT_MAP[a.category] || ""}`))
+        .slice(0, 5)
+        .map((a) => ({
+          kind: "arsenal",
+          id: a.id,
+          title: a.title,
+          sub: a.description,
+          tag: ARSENAL_CAT_MAP[a.category] || "Arsenal",
+          icon: a.file,
+        }))
+    );
+
+    // 6. District Wordmarks
+    addGroup(
+      "Distritos de Leonida",
+      Object.values(state.manifest.wordmarks || {})
+        .filter((w) => matches(w.label))
+        .slice(0, 4)
+        .map((w) => ({
+          kind: "wordmark",
+          id: w.id,
+          title: w.label,
+          sub: "Distrito y condado de Leonida",
+          tag: "Distrito",
+          icon: w.file,
+        }))
+    );
+
+    state.cmdItems = flat;
+    state.cmdActiveIdx = 0;
+
+    if (!flat.length) {
+      box.innerHTML = `<div class="empty-state">Sin resultados para "${esc(rawQuery)}". Prueba con "Kirk", "Bret", "dinero", "maletero", "WAiNK" o un sector como "G-7".</div>`;
+      return;
+    }
+
+    box.innerHTML = groups
+      .map(
+        (g) => `
+        <div class="cmd-group-head">${esc(g.label)}</div>
+        ${g.items
+          .map(
+            (it) => `
+          <button type="button" class="cmd-item${it._idx === 0 ? " is-active" : ""}" data-cmd-idx="${it._idx}">
+            <img src="${esc(it.icon)}" alt="" class="cmd-item-icon" />
+            <span class="cmd-item-text">
+              <span class="cmd-item-title">${esc(it.title)}</span>
+              <span class="cmd-item-sub">${esc(it.sub)}</span>
+            </span>
+            <span class="cmd-item-tag">${esc(it.tag)}</span>
+          </button>`
+          )
+          .join("")}`
+      )
+      .join("");
+  }
+
+  function setCmdActive(nextIdx) {
+    const total = state.cmdItems.length;
+    if (!total) return;
+    state.cmdActiveIdx = ((nextIdx % total) + total) % total;
+    document.querySelectorAll("#global-search-results .cmd-item").forEach((el) => {
+      const on = Number(el.dataset.cmdIdx) === state.cmdActiveIdx;
+      el.classList.toggle("is-active", on);
+      if (on) el.scrollIntoView({ block: "nearest" });
+    });
+  }
+
+  function executeCmdItem(item) {
+    if (!item) return;
+    closeGlobalSearch();
+    if (item.kind === "marker") {
+      jumpToMarkerOnMap(item.id);
+    } else if (item.kind === "event") {
+      state.highlightedEventId = item.id;
+      state.eventType = "all";
+      state.eventSearch = "";
+      $("events-search").value = "";
+      renderEventsView();
+      switchView("events");
+    } else if (item.kind === "mechanic" || item.kind === "trophy") {
+      state.highlightedGuideId = item.id;
+      state.mechCat = "all";
+      state.trophyCat = "all";
+      state.trophySearch = "";
+      $("trophy-search").value = "";
+      renderGuideView();
+      switchView("guide");
+    } else if (item.kind === "collectible") {
+      state.collCat = "all";
+      state.collSearch = item.title;
+      $("coll-search").value = item.title;
+      renderCollectiblesView();
+      switchView("collectibles");
+    } else if (item.kind === "arsenal") {
+      state.arsenalCat = "all";
+      state.arsenalSearch = item.title;
+      $("arsenal-search").value = item.title;
+      renderArsenalView();
+      switchView("arsenal");
+    } else if (item.kind === "wordmark") {
+      state.blipGroup = "wordmarks";
+      renderBlipsView();
+      switchView("blips");
+    }
+  }
+
+  // =========================================================================
   // EXPORT / IMPORT COMMUNITY PACK JSON
   // =========================================================================
   function exportCommunityJson() {
     const pack = {
       app: "GTA VI Atlas de Leonida",
-      version: 4,
+      version: 5,
       exportedAt: new Date().toISOString(),
       markers: state.markers,
       progress: {
         foundMarkers: Array.from(state.foundMarkers),
         foundCollectibles: Array.from(state.foundCollectibles),
         completedEvents: Array.from(state.completedEvents),
+        unlockedTrophies: Array.from(state.unlockedTrophies),
       },
     };
     const blob = new Blob([JSON.stringify(pack, null, 2)], { type: "application/json" });
@@ -1578,11 +2081,13 @@
           state.foundMarkers = new Set(parsed.progress.foundMarkers || []);
           state.foundCollectibles = new Set(parsed.progress.foundCollectibles || []);
           state.completedEvents = new Set(parsed.progress.completedEvents || []);
+          state.unlockedTrophies = new Set(parsed.progress.unlockedTrophies || []);
           await persistProgress();
         }
         renderCategoryFilters();
         renderMarkers();
         renderEventsView();
+        renderGuideView();
         renderCollectiblesView();
         toast(`Importados ${state.markers.length} marcadores.`);
       } catch (err) {
@@ -1999,15 +2504,7 @@
     $("events-grid").addEventListener("click", async (e) => {
       const gotoBtn = e.target.closest("[data-goto-marker]");
       if (gotoBtn) {
-        const mid = gotoBtn.dataset.gotoMarker;
-        state.enabledCategories.add("event");
-        renderCategoryFilters();
-        switchView("map");
-        requestAnimationFrame(() => {
-          openInspector(mid, true, 4.8, true);
-          const mk = state.markers.find((x) => x.id === mid);
-          if (mk?.wordmark) showZoneWordmark(mk.wordmark);
-        });
+        jumpToMarkerOnMap(gotoBtn.dataset.gotoMarker);
         return;
       }
       const toggleBtn = e.target.closest("[data-toggle-event]");
@@ -2022,6 +2519,94 @@
       const lb = e.target.closest("[data-lightbox-src]");
       if (lb) {
         openLightbox(lb.dataset.lightboxSrc, lb.dataset.lightboxTitle, lb.dataset.lightboxMeta);
+      }
+    });
+
+    // Guide & Trophies View events
+    $("mech-cat-pills").addEventListener("click", (e) => {
+      const btn = e.target.closest(".filter-pill");
+      if (!btn) return;
+      state.mechCat = btn.dataset.mechCat;
+      state.highlightedGuideId = null;
+      renderGuideView();
+    });
+    $("mechanics-grid").addEventListener("click", (e) => {
+      const gotoBtn = e.target.closest("[data-goto-marker]");
+      if (gotoBtn) jumpToMarkerOnMap(gotoBtn.dataset.gotoMarker);
+    });
+    $("trophy-cat-pills").addEventListener("click", (e) => {
+      const btn = e.target.closest(".filter-pill");
+      if (!btn) return;
+      state.trophyCat = btn.dataset.trophyCat;
+      state.highlightedGuideId = null;
+      renderGuideView();
+    });
+    $("trophy-search").addEventListener("input", (e) => {
+      state.trophySearch = e.target.value;
+      renderGuideView();
+    });
+    $("trophy-only-pending").addEventListener("change", (e) => {
+      state.trophiesOnlyPending = e.target.checked;
+      renderGuideView();
+    });
+    $("trophies-grid").addEventListener("click", async (e) => {
+      const gotoBtn = e.target.closest("[data-goto-marker]");
+      if (gotoBtn) {
+        jumpToMarkerOnMap(gotoBtn.dataset.gotoMarker);
+        return;
+      }
+      const openEvBtn = e.target.closest("[data-open-event]");
+      if (openEvBtn) {
+        state.highlightedEventId = openEvBtn.dataset.openEvent;
+        state.eventType = "all";
+        state.eventSearch = "";
+        $("events-search").value = "";
+        renderEventsView();
+        switchView("events");
+        return;
+      }
+      const toggleBtn = e.target.closest("[data-toggle-trophy]");
+      if (toggleBtn) {
+        const tid = toggleBtn.dataset.toggleTrophy;
+        if (state.unlockedTrophies.has(tid)) state.unlockedTrophies.delete(tid);
+        else state.unlockedTrophies.add(tid);
+        await persistProgress();
+        renderGuideView();
+      }
+    });
+
+    // Global Search (Ctrl+K) events
+    $("btn-global-search").addEventListener("click", () => openGlobalSearch(""));
+    $("global-search-backdrop").addEventListener("click", (e) => {
+      if (e.target === $("global-search-backdrop")) closeGlobalSearch();
+    });
+    $("global-search-input").addEventListener("input", (e) => {
+      renderGlobalSearchResults(e.target.value);
+    });
+    $("global-search-input").addEventListener("keydown", (e) => {
+      if (e.key === "ArrowDown") {
+        e.preventDefault();
+        setCmdActive(state.cmdActiveIdx + 1);
+      } else if (e.key === "ArrowUp") {
+        e.preventDefault();
+        setCmdActive(state.cmdActiveIdx - 1);
+      } else if (e.key === "Enter") {
+        e.preventDefault();
+        executeCmdItem(state.cmdItems[state.cmdActiveIdx]);
+      }
+    });
+    $("global-search-results").addEventListener("click", (e) => {
+      const quick = e.target.closest("[data-quick-q]");
+      if (quick) {
+        const q = quick.dataset.quickQ;
+        $("global-search-input").value = q;
+        renderGlobalSearchResults(q);
+        $("global-search-input").focus();
+        return;
+      }
+      const itemBtn = e.target.closest("[data-cmd-idx]");
+      if (itemBtn) {
+        executeCmdItem(state.cmdItems[Number(itemBtn.dataset.cmdIdx)]);
       }
     });
 
@@ -2041,6 +2626,11 @@
       renderCollectiblesView();
     });
     $("collectibles-grid").addEventListener("click", async (e) => {
+      const gotoBtn = e.target.closest("[data-goto-marker]");
+      if (gotoBtn) {
+        jumpToMarkerOnMap(gotoBtn.dataset.gotoMarker);
+        return;
+      }
       const toggleBtn = e.target.closest("[data-toggle-coll]");
       if (toggleBtn) {
         const cid = toggleBtn.dataset.toggleColl;
@@ -2068,6 +2658,11 @@
       renderArsenalView();
     });
     $("arsenal-grid").addEventListener("click", (e) => {
+      const gotoBtn = e.target.closest("[data-goto-marker]");
+      if (gotoBtn) {
+        jumpToMarkerOnMap(gotoBtn.dataset.gotoMarker);
+        return;
+      }
       const lb = e.target.closest("[data-lightbox-src]");
       if (lb) {
         openLightbox(lb.dataset.lightboxSrc, lb.dataset.lightboxTitle, lb.dataset.lightboxMeta);
@@ -2102,11 +2697,19 @@
       if (e.target === $("lightbox")) closeLightbox();
     });
     window.addEventListener("keydown", (e) => {
+      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "k") {
+        e.preventDefault();
+        if ($("global-search-backdrop").classList.contains("hidden")) openGlobalSearch("");
+        else closeGlobalSearch();
+        return;
+      }
+
       const tag = (e.target?.tagName || "").toLowerCase();
       const typing = tag === "input" || tag === "textarea" || tag === "select";
 
       if (e.key === "Escape") {
-        if (!$("lightbox").classList.contains("hidden")) closeLightbox();
+        if (!$("global-search-backdrop").classList.contains("hidden")) closeGlobalSearch();
+        else if (!$("lightbox").classList.contains("hidden")) closeLightbox();
         else if (!$("pin-modal-backdrop").classList.contains("hidden")) closePinModal();
         else if (state.placing) setPlacementMode(false);
         else if (state.measuring) setMeasureMode(false);
