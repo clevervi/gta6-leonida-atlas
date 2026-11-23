@@ -1,0 +1,528 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=5.0" />
+  <title>GTA VI — Atlas y Guia Interactiva de Leonida</title>
+  <meta name="description" content="Mapa interactivo completo de Leonida en GTA VI con modo noche y dia, guia paso a paso de Extranos y Locos (Kirk y el Skunk Ape, Bret Vogel, Kenton, Yago), caza legendaria, coleccionables, armas, vehiculos y medidor GPS." />
+  <meta name="theme-color" content="#08090c" />
+  <meta property="og:type" content="website" />
+  <meta property="og:title" content="GTA VI — Atlas y Guia Interactiva de Leonida" />
+  <meta property="og:description" content="Mapa interactivo de los 5 condados y cayos de Leonida, 32 guias de eventos y Extranos y Locos, 155 coleccionables, 130 armas y vehiculos y medidor GPS." />
+  <meta property="og:image" content="/og-preview.jpg" />
+  <meta name="twitter:card" content="summary_large_image" />
+  <meta name="twitter:title" content="GTA VI — Atlas y Guia Interactiva de Leonida" />
+  <meta name="twitter:description" content="Mapa completo de Leonida, eventos, Extranos y Locos, coleccionables, arsenal y garaje." />
+  <meta name="twitter:image" content="/og-preview.jpg" />
+  <link rel="icon" type="image/png" href="/extracted/blips/blip_map.png" />
+  <link rel="stylesheet" href="/styles.css" />
+</head>
+<body>
+  <!-- TOP NAVIGATION BAR -->
+  <header class="topbar">
+    <div class="topbar-brand">
+      <img src="/extracted/branding/gta6_logo_color.png" alt="Grand Theft Auto VI" class="brand-logo" />
+      <div class="brand-meta">
+        <span class="brand-title">LEONIDA ATLAS</span>
+        <span class="brand-sub mono">GUIA INTERACTIVA</span>
+      </div>
+    </div>
+
+    <nav class="main-nav" role="tablist" aria-label="Secciones de la guia">
+      <button class="nav-tab active" data-view="map" role="tab" aria-selected="true">
+        <span>MAPA</span>
+      </button>
+      <button class="nav-tab" data-view="events" role="tab" aria-selected="false">
+        <span>EVENTOS Y MISIONES</span>
+        <span class="nav-count mono" id="nav-events-count">0/0</span>
+      </button>
+      <button class="nav-tab" data-view="collectibles" role="tab" aria-selected="false">
+        <span>COLECCIONABLES</span>
+        <span class="nav-count mono" id="nav-coll-count">0/0</span>
+      </button>
+      <button class="nav-tab" data-view="arsenal" role="tab" aria-selected="false">
+        <span>ARSENAL Y GARAJE</span>
+        <span class="nav-count mono" id="nav-arsenal-count">0</span>
+      </button>
+      <button class="nav-tab" data-view="blips" role="tab" aria-selected="false">
+        <span>DISTRITOS E ICONOS</span>
+      </button>
+    </nav>
+
+    <div class="topbar-actions">
+      <button class="btn btn-flat" id="btn-measure-route" title="Medir ruta GPS en millas y km (Tecla M)">
+        <img src="/extracted/blips/ui_route.png" alt="" class="ui-icon" />
+        <span>RUTA</span>
+      </button>
+      <button class="btn btn-primary" id="btn-add-pin" title="Colocar un nuevo pin en Leonida">
+        <img src="/extracted/blips/ui_add.png" alt="" class="ui-icon" />
+        <span>NUEVO PIN</span>
+      </button>
+      <button class="btn btn-flat icon-only" id="btn-export-json" title="Exportar tus pines y progreso">
+        <img src="/extracted/blips/ui_download.png" alt="" class="ui-icon" />
+      </button>
+      <label class="btn btn-flat icon-only btn-file" title="Importar pines y progreso">
+        <img src="/extracted/blips/ui_settings.png" alt="" class="ui-icon" />
+        <input type="file" id="input-import-json" accept="application/json,.json" hidden />
+      </label>
+    </div>
+  </header>
+
+  <!-- VIEW 1: FULL LEONIDA INTERACTIVE MAP -->
+  <main class="view-section active" id="view-map">
+    <div class="subbar">
+      <div class="region-strip" id="region-bar" role="toolbar" aria-label="Condados de Leonida"></div>
+      <div class="theme-switch" role="group" aria-label="Modo del mapa">
+        <button type="button" class="theme-btn active" id="btn-theme-night" data-theme="night" title="Mapa Nocturno (Tecla N)">NOCHE</button>
+        <button type="button" class="theme-btn" id="btn-theme-day" data-theme="day" title="Mapa de Dia (Tecla N)">DIA</button>
+      </div>
+    </div>
+
+    <div class="map-workspace">
+      <!-- LEFT LEGEND & DIRECTORY SIDEBAR -->
+      <aside class="sidebar" id="sidebar">
+        <div class="sidebar-top">
+          <div class="search-box">
+            <img src="/extracted/blips/ui_search.png" alt="" class="ui-icon search-icon" />
+            <input type="text" id="map-search" placeholder="Buscar ciudad, evento, Kirk, sector..." autocomplete="off" />
+            <button class="icon-clear hidden" id="btn-clear-search" title="Limpiar busqueda">
+              <img src="/extracted/blips/ui_close.png" alt="" class="ui-icon" />
+            </button>
+          </div>
+
+          <div class="progress-strip">
+            <div class="progress-row">
+              <span class="progress-label">EXPLORACION</span>
+              <span class="progress-value mono" id="map-progress-text">0 / 0</span>
+            </div>
+            <div class="progress-track">
+              <div class="progress-fill" id="map-progress-bar" style="width: 0%"></div>
+            </div>
+            <div class="toggle-row">
+              <label class="switch-label">
+                <input type="checkbox" id="chk-hide-found" />
+                <span>Sin hallar</span>
+              </label>
+              <label class="switch-label">
+                <input type="checkbox" id="chk-show-labels" />
+                <span>Etiquetas fijas</span>
+              </label>
+            </div>
+          </div>
+        </div>
+
+        <div class="sidebar-block">
+          <div class="block-head">
+            <h3>LEYENDA</h3>
+            <div class="mini-actions">
+              <button class="link-btn" id="btn-cat-all">Todas</button>
+              <span class="sep">/</span>
+              <button class="link-btn" id="btn-cat-none">Ninguna</button>
+            </div>
+          </div>
+          <div class="category-grid" id="category-filters"></div>
+        </div>
+
+        <div class="sidebar-block directory-block">
+          <div class="block-head">
+            <h3>UBICACIONES</h3>
+            <span class="count-num mono" id="visible-count">0</span>
+          </div>
+          <div class="marker-list" id="marker-list"></div>
+        </div>
+      </aside>
+
+      <!-- CENTER MAP STAGE -->
+      <section class="map-stage-wrap" id="map-stage-wrap">
+        <!-- District Wordmark HUD Toast -->
+        <div class="zone-wordmark-toast hidden" id="zone-wordmark-toast" aria-hidden="true">
+          <img id="zone-wordmark-img" src="" alt="" />
+        </div>
+
+        <!-- Placement Mode Bar -->
+        <div class="stage-banner hidden" id="placement-banner">
+          <img src="/extracted/blips/blip_pin.png" alt="" class="banner-icon" />
+          <div class="banner-text">
+            <strong>MODO NUEVO PIN:</strong> haz clic en cualquier punto de Leonida para situar tu marcador.
+          </div>
+          <button class="btn btn-sm btn-flat" id="btn-cancel-placement">Cancelar (ESC)</button>
+        </div>
+
+        <!-- GPS Route Measure Bar -->
+        <div class="stage-banner route-banner hidden" id="route-banner">
+          <img src="/extracted/blips/ui_route.png" alt="" class="ui-icon" />
+          <div class="banner-text">
+            <strong>RUTA GPS:</strong>
+            <span id="route-readout" class="mono">Haz clic en el mapa para trazar puntos y medir distancia</span>
+          </div>
+          <button class="btn btn-sm btn-flat" id="btn-route-undo">Deshacer</button>
+          <button class="btn btn-sm btn-flat" id="btn-route-clear">Limpiar</button>
+          <button class="btn btn-sm btn-flat" id="btn-route-close">Cerrar</button>
+        </div>
+
+        <!-- Interactive Pan/Zoom Surface -->
+        <div class="map-viewport" id="map-viewport" tabindex="0" aria-label="Mapa interactivo de Leonida">
+          <div class="map-world" id="map-world">
+            <img id="map-image" src="" alt="Mapa del Estado de Leonida — Grand Theft Auto VI" draggable="false" />
+            <svg class="route-svg" id="route-svg" viewBox="0 0 5395 7521" preserveAspectRatio="none"></svg>
+            <div class="map-pins-layer" id="map-pins-layer"></div>
+            <div class="placement-reticle hidden" id="placement-reticle"></div>
+          </div>
+        </div>
+
+        <!-- Bottom-Left Tactical Status Bar -->
+        <div class="status-bar mono">
+          <span class="sb-seg"><span class="sb-k">SECTOR</span> <strong id="hud-grid">G-7</strong></span>
+          <span class="sb-div"></span>
+          <span class="sb-seg"><span class="sb-k">COORD</span> <span id="hud-coords">50.0, 50.0</span></span>
+          <span class="sb-div"></span>
+          <span class="sb-seg"><span class="sb-k">ZOOM</span> <span id="hud-zoom">100%</span></span>
+          <span class="sb-div sb-hide-narrow"></span>
+          <span class="sb-seg sb-hide-narrow" id="hud-source">MODO NOCHE</span>
+        </div>
+
+        <!-- Interactive Corner Overview Minimap -->
+        <div class="minimap-panel" id="minimap-panel" title="Clic o arrastra para moverte por Leonida">
+          <img id="minimap-img" src="/extracted/maps/leonida_minimap_night.jpg" alt="Radar de Leonida" draggable="false" />
+          <div class="minimap-viewport-rect" id="minimap-rect"></div>
+          <span class="minimap-label mono">RADAR LEONIDA</span>
+        </div>
+
+        <!-- Bottom-Right Square Map Controls -->
+        <div class="map-controls-br">
+          <button class="ctrl-btn" id="btn-zoom-in" title="Acercar (+)">+</button>
+          <button class="ctrl-btn" id="btn-zoom-out" title="Alejar (-)">-</button>
+          <button class="ctrl-btn ctrl-text" id="btn-zoom-fit" title="Ver toda Leonida (F)">FIT</button>
+          <button class="ctrl-btn ctrl-text is-on" id="btn-toggle-pins" title="Mostrar u ocultar pines (P)">PINES</button>
+          <button class="ctrl-btn ctrl-text" id="btn-toggle-sidebar" title="Mostrar u ocultar panel lateral">LISTA</button>
+        </div>
+      </section>
+
+      <!-- RIGHT EDITORIAL DETAIL INSPECTOR -->
+      <aside class="inspector hidden" id="inspector" aria-label="Detalles de la ubicacion">
+        <div class="inspector-top">
+          <div class="inspector-head-left">
+            <img id="insp-blip" src="" alt="" class="insp-blip-img" />
+            <div class="insp-titles">
+              <span class="insp-cat" id="insp-cat">CATEGORIA</span>
+              <h2 id="insp-title">Ubicacion</h2>
+            </div>
+          </div>
+          <button class="icon-btn" id="btn-close-inspector" title="Cerrar (ESC)">
+            <img src="/extracted/blips/ui_close.png" alt="" class="ui-icon" />
+          </button>
+        </div>
+
+        <div class="inspector-body">
+          <!-- District Wordmark -->
+          <div class="insp-wordmark-bar hidden" id="insp-wordmark-bar">
+            <img id="insp-wordmark" src="" alt="" />
+          </div>
+
+          <!-- Full-Bleed Game Photo -->
+          <div class="insp-media hidden" id="insp-media">
+            <img id="insp-image" src="" alt="Vista de la ubicacion" />
+            <span class="insp-media-hint mono">AMPLIAR IMAGEN</span>
+          </div>
+
+          <div class="insp-content">
+            <div class="insp-tags" id="insp-badges"></div>
+            <p class="insp-desc" id="insp-desc"></p>
+
+            <!-- Rich Event / Stranger & Freaks Mini-Walkthrough (shown on event pins) -->
+            <div class="insp-event-guide hidden" id="insp-event-guide"></div>
+
+            <div class="insp-meta-table">
+              <div class="meta-row">
+                <span class="meta-label">ZONA</span>
+                <span class="meta-val" id="insp-region">—</span>
+              </div>
+              <div class="meta-row">
+                <span class="meta-label">SECTOR / COORD</span>
+                <span class="meta-val mono" id="insp-coords">—</span>
+              </div>
+              <div class="meta-row">
+                <span class="meta-label">GUIA / AUTOR</span>
+                <span class="meta-val" id="insp-author">—</span>
+              </div>
+            </div>
+
+            <div class="insp-actions">
+              <button class="btn btn-check" id="btn-insp-found">
+                <img src="/extracted/blips/ui_check.png" alt="" class="ui-icon" />
+                <span id="btn-insp-found-label">Marcar Encontrado</span>
+              </button>
+              <button class="btn btn-flat" id="btn-insp-vote">
+                <span>Votar (<strong id="insp-votes">0</strong>)</span>
+              </button>
+            </div>
+
+            <div class="insp-secondary-actions">
+              <button class="btn btn-sm btn-flat" id="btn-insp-share" title="Copiar enlace directo a este marcador">
+                <img src="/extracted/blips/blip_pin.png" alt="" class="ui-icon" />
+                <span>Enlace</span>
+              </button>
+              <button class="btn btn-sm btn-flat" id="btn-insp-edit">
+                <img src="/extracted/blips/ui_settings.png" alt="" class="ui-icon" />
+                <span>Editar</span>
+              </button>
+              <button class="btn btn-sm btn-danger" id="btn-insp-delete">
+                <img src="/extracted/blips/ui_trash.png" alt="" class="ui-icon" />
+                <span>Eliminar</span>
+              </button>
+            </div>
+
+            <div class="comments-block">
+              <div class="block-head">
+                <h3>NOTAS DE LA COMUNIDAD</h3>
+                <span class="count-num mono" id="insp-comments-count">0</span>
+              </div>
+              <div class="comments-list" id="insp-comments-list"></div>
+              <form class="comment-form" id="comment-form">
+                <input type="text" id="comment-author" placeholder="Tu alias (opcional)" maxlength="40" />
+                <textarea id="comment-text" rows="2" placeholder="Anade una pista, ruta o hallazgo..." required></textarea>
+                <button type="submit" class="btn btn-primary btn-sm">PUBLICAR NOTA</button>
+              </form>
+            </div>
+          </div>
+        </div>
+      </aside>
+    </div>
+  </main>
+
+  <!-- VIEW 2: EVENTS, STRANGERS & FREAKS, LEGENDARY HUNTS & 100% ACTIVITIES -->
+  <main class="view-section" id="view-events">
+    <div class="page-container">
+      <div class="page-header">
+        <div class="page-header-left">
+          <img src="/extracted/blips/logo_bigfoot.png" alt="Eventos de Leonida" class="header-emblem" />
+          <div>
+            <h1>EVENTOS, EXTRANOS Y LOCOS Y ACTIVIDADES</h1>
+            <p>Guia paso a paso de todas las historias secundarias de Leonida (Kirk y el Skunk Ape, Bret Vogel, Kenton, Yago, Pilot Pete, Randy y mas), eventos aleatorios, caza legendaria y requisitos del 100%.</p>
+          </div>
+        </div>
+        <div class="header-progress">
+          <div class="progress-row">
+            <span class="progress-label">COMPLETADOS</span>
+            <strong class="mono" id="ev-progress-pct">0%</strong>
+          </div>
+          <div class="progress-track lg">
+            <div class="progress-fill" id="ev-progress-bar" style="width: 0%"></div>
+          </div>
+          <span class="muted mono" id="ev-progress-detail">0 de 0 completados</span>
+        </div>
+      </div>
+
+      <!-- 100% COMPLETION GUIDE SUMMARY STRIP -->
+      <section class="guide-100-box" id="guide-100-box"></section>
+
+      <div class="toolbar-row">
+        <div class="filter-strip" id="events-type-pills"></div>
+        <div class="toolbar-right">
+          <div class="search-box compact">
+            <img src="/extracted/blips/ui_search.png" alt="" class="ui-icon search-icon" />
+            <input type="text" id="events-search" placeholder="Buscar Kirk, Skunk Ape, Bret, Lucia..." />
+          </div>
+          <label class="switch-label">
+            <input type="checkbox" id="events-only-pending" />
+            <span>Solo pendientes</span>
+          </label>
+        </div>
+      </div>
+
+      <div class="events-grid" id="events-grid"></div>
+    </div>
+  </main>
+
+  <!-- VIEW 3: COLLECTIBLES VAULT TRACKER -->
+  <main class="view-section" id="view-collectibles">
+    <div class="page-container">
+      <div class="page-header">
+        <div class="page-header-left">
+          <img src="/extracted/branding/gta6_vi_palms.png" alt="GTA VI" class="header-emblem" />
+          <div>
+            <h1>BOVEDA DE COLECCIONABLES</h1>
+            <p>Medallas doradas, los 11 Ojos Secretos (WAiNK), fauna terrestre y marina de Leonida, cartas coleccionables, comics, campos de tiro y lugares emblematicos para seguir tu progreso.</p>
+          </div>
+        </div>
+        <div class="header-progress">
+          <div class="progress-row">
+            <span class="progress-label">PROGRESO TOTAL</span>
+            <strong class="mono" id="coll-progress-pct">0%</strong>
+          </div>
+          <div class="progress-track lg">
+            <div class="progress-fill" id="coll-progress-bar" style="width: 0%"></div>
+          </div>
+          <span class="muted mono" id="coll-progress-detail">0 de 0 encontrados</span>
+        </div>
+      </div>
+
+      <div class="toolbar-row">
+        <div class="filter-strip" id="coll-cat-pills"></div>
+        <div class="toolbar-right">
+          <div class="search-box compact">
+            <img src="/extracted/blips/ui_search.png" alt="" class="ui-icon search-icon" />
+            <input type="text" id="coll-search" placeholder="Filtrar coleccionables..." />
+          </div>
+          <label class="switch-label">
+            <input type="checkbox" id="coll-only-pending" />
+            <span>Solo pendientes</span>
+          </label>
+        </div>
+      </div>
+
+      <div class="collectibles-grid" id="collectibles-grid"></div>
+    </div>
+  </main>
+
+  <!-- VIEW 4: ARSENAL, GARAGE & LICENSE PLATES -->
+  <main class="view-section" id="view-arsenal">
+    <div class="page-container">
+      <div class="page-header">
+        <div class="page-header-left">
+          <img src="/extracted/branding/leonida_great_seal.png" alt="Leonida" class="header-emblem round" />
+          <div>
+            <h1>ARSENAL, VEHICULOS Y MATRICULAS</h1>
+            <p>Catalogo completo de armas de fuego, pistolas, equipo tactico, deportivos, motos, embarcaciones, hidrodeslizadores y matriculas del Estado de Leonida y Gloriana.</p>
+          </div>
+        </div>
+        <div class="toolbar-right">
+          <div class="search-box compact">
+            <img src="/extracted/blips/ui_search.png" alt="" class="ui-icon search-icon" />
+            <input type="text" id="arsenal-search" placeholder="Buscar arma, coche, barco..." />
+          </div>
+        </div>
+      </div>
+
+      <div class="toolbar-row">
+        <div class="filter-strip" id="arsenal-cat-pills"></div>
+      </div>
+
+      <div class="arsenal-grid" id="arsenal-grid"></div>
+    </div>
+  </main>
+
+  <!-- VIEW 5: DISTRICTS, WORDMARKS & MAP ICONS -->
+  <main class="view-section" id="view-blips">
+    <div class="page-container">
+      <div class="page-header">
+        <div class="page-header-left">
+          <img src="/extracted/blips/blip_radar.png" alt="" class="header-emblem" />
+          <div>
+            <h1>DISTRITOS, INSIGNIAS E ICONOS DEL MAPA</h1>
+            <p>Explora los 48 rotulos de barrios y condados de Leonida, insignias policiales y todos los iconos del radar. Haz clic en cualquier icono para colocar un marcador propio en el mapa.</p>
+          </div>
+        </div>
+      </div>
+
+      <div class="toolbar-row">
+        <div class="filter-strip" id="blips-group-pills"></div>
+      </div>
+
+      <div class="blips-catalog-grid" id="blips-catalog-grid"></div>
+    </div>
+  </main>
+
+  <!-- MODAL: CREATE / EDIT COMMUNITY PIN -->
+  <div class="modal-backdrop hidden" id="pin-modal-backdrop" role="dialog" aria-modal="true" aria-labelledby="pin-modal-title">
+    <div class="modal-card">
+      <div class="modal-head">
+        <div class="modal-head-left">
+          <img id="modal-preview-blip" src="/extracted/blips/blip_pin.png" alt="" class="modal-blip-preview" />
+          <div>
+            <h2 id="pin-modal-title">NUEVO MARCADOR</h2>
+            <span class="muted mono" id="pin-modal-subtitle">Estado de Leonida</span>
+          </div>
+        </div>
+        <button class="icon-btn" id="btn-close-pin-modal" title="Cerrar">
+          <img src="/extracted/blips/ui_close.png" alt="" class="ui-icon" />
+        </button>
+      </div>
+
+      <form id="pin-form" class="modal-body">
+        <input type="hidden" id="pin-edit-id" />
+
+        <div class="form-grid-2">
+          <label class="field">
+            <span>TITULO *</span>
+            <input type="text" id="pin-title" required maxlength="120" placeholder="Ej. Flamenco de la coca, Efigie del Skunk Ape..." />
+          </label>
+          <label class="field">
+            <span>CATEGORIA</span>
+            <select id="pin-category"></select>
+          </label>
+        </div>
+
+        <div class="form-grid-3">
+          <label class="field">
+            <span>ZONA / CONDADO</span>
+            <input type="text" id="pin-region" maxlength="80" placeholder="Ej. Vice-Dale County · Sector G-7" />
+          </label>
+          <label class="field">
+            <span>COORD X (%)</span>
+            <input type="number" id="pin-x" min="0" max="100" step="0.1" required />
+          </label>
+          <label class="field">
+            <span>COORD Y (%)</span>
+            <input type="number" id="pin-y" min="0" max="100" step="0.1" required />
+          </label>
+        </div>
+
+        <label class="field">
+          <span>DESCRIPCION Y DETALLES</span>
+          <textarea id="pin-description" rows="3" maxlength="1000" placeholder="Describe como encontrarlo, requisitos, horarios o recompensas..."></textarea>
+        </label>
+
+        <div class="form-grid-2">
+          <label class="field">
+            <span>AUTOR / ALIAS</span>
+            <input type="text" id="pin-author" maxlength="50" placeholder="Tu nombre o tag" />
+          </label>
+          <label class="field">
+            <span>IMAGEN DEL JUEGO (OPCIONAL)</span>
+            <select id="pin-image-select">
+              <option value="">Sin imagen adjunta</option>
+            </select>
+          </label>
+        </div>
+
+        <div class="field">
+          <span>ICONO DEL MARCADOR</span>
+          <div class="blip-picker-grid" id="blip-picker-grid"></div>
+        </div>
+
+        <div class="modal-footer">
+          <button type="button" class="btn btn-flat" id="btn-cancel-pin-modal">CANCELAR</button>
+          <button type="submit" class="btn btn-primary">
+            <img src="/extracted/blips/ui_check.png" alt="" class="ui-icon" />
+            <span id="pin-submit-label">GUARDAR MARCADOR</span>
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- LIGHTBOX FOR FULL IMAGE VIEW -->
+  <div class="lightbox hidden" id="lightbox" role="dialog" aria-modal="true">
+    <div class="lightbox-inner">
+      <div class="lightbox-top">
+        <div>
+          <h3 id="lightbox-title">Vista Ampliada</h3>
+          <span class="muted" id="lightbox-meta"></span>
+        </div>
+        <button class="icon-btn" id="btn-close-lightbox" title="Cerrar (ESC)">
+          <img src="/extracted/blips/ui_close.png" alt="" class="ui-icon" />
+        </button>
+      </div>
+      <div class="lightbox-stage">
+        <img id="lightbox-img" src="" alt="" />
+      </div>
+    </div>
+  </div>
+
+  <!-- TOAST NOTIFICATIONS -->
+  <div class="toast-stack" id="toast-stack" aria-live="polite"></div>
+
+  <script src="/app.js"></script>
+</body>
+</html>

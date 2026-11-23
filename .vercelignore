@@ -1,0 +1,8 @@
+extracted/
+data/
+tools/
+web/
+serve.py
+README.md
+__pycache__/
+.git/

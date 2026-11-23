@@ -1,0 +1,19 @@
+# Raw uncompressed local development assets & extraction scripts
+# (Optimized WebP/JPEG/PNG production bundle lives in /public/extracted/)
+/extracted/
+/tools/
+/data/datamining_report.json
+/data/extracted_index.json
+/data/user_progress.json
+/data/custom_map_meta.json
+/data/custom_leonida_map.*
+/data/game_assets_manifest.json
+
+# Python & OS
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+.DS_Store
+Thumbs.db
+.vercel/
